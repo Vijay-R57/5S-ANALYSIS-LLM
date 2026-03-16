@@ -7,6 +7,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// ─── Employee Credentials ────────────────────────────────────────────────────
+// To add a new employee: copy one block below and fill in their details.
+// After editing this file, redeploy the function:
+//   npx supabase functions deploy employee-login --project-ref hbfwlvxeywibqmsywqgm
+// ─────────────────────────────────────────────────────────────────────────────
 const EMPLOYEES = [
   {
     employeeId: "ARC100",
@@ -19,7 +24,14 @@ const EMPLOYEES = [
     name: "Naveen SV",
     department: "Operational Excellence",
     password: "ARCOLAB101",
-  }
+  },
+  // Guest / forker account — share these credentials with friends who fork the project
+  {
+    employeeId: "ARC102",
+    name: "Guest User",
+    department: "Operational Excellence",
+    password: "ARCOLAB102",
+  },
 ];
 
 serve(async (req) => {
