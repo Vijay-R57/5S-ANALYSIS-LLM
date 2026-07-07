@@ -10,7 +10,7 @@ export interface GeoMeta {
 interface ImageUploaderProps {
   label: string;
   sublabel: string;
-  variant: "before" | "after";
+  variant?: "workplace";
   image: string | null;
   onImageChange: (base64: string | null, geo?: GeoMeta | null) => void;
   timestamp?: string | null;
@@ -48,7 +48,7 @@ const formatTimestamp = (iso: string) => {
 const ImageUploader = ({
   label,
   sublabel,
-  variant,
+  variant = "workplace",
   image,
   onImageChange,
   employeeName = "Employee",
@@ -317,11 +317,11 @@ const ImageUploader = ({
   }, [openCamera]);
 
   // ─── Styling helpers ─────────────────────────────────────────────────────
-  const borderColor = variant === "before" ? "border-destructive/30" : "border-primary/30";
-  const hoverBorder = variant === "before" ? "hover:border-destructive/50" : "hover:border-primary/50";
-  const tagBg = variant === "before" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary";
-  const accentText = variant === "before" ? "text-destructive" : "text-primary";
-  const accentBg = variant === "before" ? "bg-destructive/5 border-destructive/20" : "bg-primary/5 border-primary/20";
+  const borderColor = "border-primary/30";
+  const hoverBorder = "hover:border-primary/50";
+  const tagBg = "bg-primary/10 text-primary";
+  const accentText = "text-primary";
+  const accentBg = "bg-primary/5 border-primary/20";
 
   // Strip geo prefix for display
   const displaySrc = image ? image.replace(/^__geo:[^_]*__/, "") : null;

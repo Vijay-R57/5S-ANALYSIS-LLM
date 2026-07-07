@@ -1,40 +1,45 @@
-import { Download, CheckCircle, AlertTriangle, TrendingUp, Clock, Wrench, ShieldCheck, Info, BarChart3, Search } from "lucide-react";
-import jsPDF from "jspdf";
-import ScoreExplanationCard from "@/components/ScoreExplanationCard";
-import BeforeAfterComparison from "@/components/BeforeAfterComparison";
-import { PILLAR_META } from "@/types/analysis";
+/**
+ * src/components/AnalysisResults.tsx
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Redesigned 5S Workplace Audit Report Dashboard (Phase 3A Redesign).
+ * Emulates a professional digital industrial 5S audit checklist sheet.
+ * Single workplace image workflow; displays executive summary and audit timeline.
+ */
 
-// Re-export for backward compat with pages that import from this file
-import type { AnalysisData, FiveSScore, ScoreExplanations } from "@/types/analysis";
-export type { AnalysisData, FiveSScore, ScoreExplanations };
-
-
-const getScoreColor = (score: number) => {
-  if (score >= 80) return "text-primary";
-  if (score >= 60) return "text-warning";
-  return "text-destructive";
-};
-
-const getBarBg = (score: number) => {
-  if (score >= 80) return "bg-primary";
-  if (score >= 60) return "bg-warning";
-  return "bg-destructive";
-};
+import React, { useState } from 'react';
+import { Download, ShieldCheck, Printer, Terminal, Eye, Sparkles } from 'lucide-react';
+import { mapAnalysisResultToAuditResult } from '@/modules/audit/utils/auditMapper';
+import AuditProgressStepper from '@/modules/audit/components/AuditProgressStepper';
+import AuditScoreCard from '@/modules/audit/components/AuditScoreCard';
+import PillarCard from '@/modules/audit/components/PillarCard';
+import type { AuditPillar } from '@/modules/audit/constants/pillars';
+import PillarAssessment from '@/modules/audit/components/PillarAssessment';
+import RecommendationCard from '@/modules/audit/components/RecommendationCard';
+import RadarScoreChart from '@/modules/audit/components/RadarScoreChart';
+import AuditSummaryCard from '@/modules/audit/components/AuditSummaryCard';
+import AuditTimelineComponent from '@/modules/audit/components/AuditTimeline';
+import type { AuditAnalysisResult, AuditTimeline } from '@/types/analysis';
+import { jsPDF } from 'jspdf';
 
 interface Props {
-  data: AnalysisData;
-  beforeImage: string;
-  afterImage: string;
+  data: AuditAnalysisResult;
+  workplaceImage: string;
   analysisTimestamp?: string;
-  beforeUploadTime?: string;
-  afterUploadTime?: string;
+  imageQualityScore?: number | null;
+  imageQualityLevel?: string | null;
+  timeline?: AuditTimeline | null;
 }
 
-const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, beforeUploadTime, afterUploadTime }: Props) => {
-  // Guard: only the display-safe scoringMethod field is checked here.
-  // rawScoringMethod intentionally contains full CV engine telemetry (including
-  // the Gemini explanation-layer tag) and is NEVER inspected by this guard.
-  const scoringMethod = data.scoringMethod || "";
+export default function AnalysisResults({
+  data,
+  workplaceImage,
+  analysisTimestamp,
+  imageQualityScore = null,
+  imageQualityLevel = null,
+  timeline = null,
+}: Props) {
+  // Deterministic scoring safety check
+  const scoringMethod = data.scoringMethod || "AI Audit (Structured Questionnaire)";
   if (
     scoringMethod.toLowerCase().includes("fallback") ||
     scoringMethod.toLowerCase().includes("gemini")
@@ -42,482 +47,523 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     throw new Error("Deterministic scoring violation detected.");
   }
 
-  const avgBefore = Math.round(Object.values(data.beforeScores).reduce((a, b) => a + b, 0) / 5);
-  const avgAfter = Math.round(Object.values(data.afterScores).reduce((a, b) => a + b, 0) / 5);
-  const timestamp = analysisTimestamp || new Date().toISOString();
+  const [devMode, setDevMode] = useState(false);
 
-  const formatDT = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
-    " at " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  // Map incoming database AI response model to future-compatible AuditResult contract
+  const auditResult = mapAnalysisResultToAuditResult(data, analysisTimestamp);
+  const { overallScore, overallMaxScore, overallPercentage, overallRating, pillars, recommendations, summary, areaInfo } = auditResult;
+
+  // Enhance summary with image quality fields passed from validation panel
+  const enhancedSummary = {
+    ...summary,
+    imageQualityScore,
+    imageQualityLevel,
   };
 
-  const downloadPdf = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20;
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
 
-    const checkPage = (heightNeeded: number) => {
-      if (y + heightNeeded > 275) {
+    let y = 15;
+    const margin = 15;
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    const checkPageBreak = (needed: number) => {
+      if (y + needed > pageHeight - 15) {
         doc.addPage();
-        y = 20;
+        y = 15;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text('ARCOLAB 5S Workplace Audit Report', margin, 10);
+        doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin - 10, 10);
+        doc.setLineWidth(0.2);
+        doc.setDrawColor(230, 230, 230);
+        doc.line(margin, 12, pageWidth - margin, 12);
       }
     };
 
-    const addParagraph = (
-      text: string,
-      fontSize = 10,
-      fontStyle = "normal",
-      textColor = [60, 60, 60],
-      indent = 15,
-      spacing = 5
-    ) => {
-      doc.setFont("times", fontStyle);
-      doc.setFontSize(fontSize);
-      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      
-      const lines = doc.splitTextToSize(text, pageWidth - indent - 15);
-      
-      lines.forEach((line: string) => {
-        checkPage(5);
-        doc.text(line, indent, y);
-        y += spacing;
-      });
-    };
+    // Header Panel
+    doc.setFillColor(26, 80, 54);
+    doc.rect(margin, y, pageWidth - (margin * 2), 20, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text('ARCOLAB 5S WORKPLACE AUDIT REPORT', margin + 5, y + 8);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('DIGITAL AUDITOR COMPLIANCE RECORD', margin + 5, y + 15);
+    y += 26;
 
-    // Title
-    doc.setFont("times", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(37, 99, 71);
-    doc.text("ARCOLAB — 5S Workplace Analysis Report", pageWidth / 2, y, { align: "center" });
-    y += 10;
-    doc.setDrawColor(37, 99, 71);
-    doc.setLineWidth(0.5);
-    doc.line(15, y, pageWidth - 15, y);
-    y += 10;
+    // Metadata details
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.text('AUDIT INFORMATION', margin, y);
+    y += 4;
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
 
-    // Timestamps
-    doc.setFont("times", "normal");
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+
+    const leftColX = margin;
+    const rightColX = pageWidth / 2 + 5;
+
+    // Left Column
+    doc.text(`Company: ${areaInfo.companyName}`, leftColX, y); y += 5;
+    doc.text(`Auditor: ${areaInfo.auditor}`, leftColX, y); y += 5;
+    doc.text(`Department: ${areaInfo.department}`, leftColX, y); y += 5;
+    doc.text(`Workspace Type: ${areaInfo.workspaceType}`, leftColX, y); y += 5;
+
+    // Reset y for right column
+    let yRight = y - 20;
+    doc.text(`Date Conducted: ${areaInfo.auditDate}`, rightColX, yRight); yRight += 5;
+    doc.text(`Area / Station: ${areaInfo.areaName}`, rightColX, yRight); yRight += 5;
+    doc.text(`Industry: ${areaInfo.industry}`, rightColX, yRight); yRight += 5;
+    doc.text(`Scoring Standard: Physical Audit 5S (0-4 Rating)`, rightColX, yRight);
+
+    y += 6;
+
+    // Summary Card (Border box)
+    checkPageBreak(40);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(margin, y, pageWidth - (margin * 2), 32, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text('EXECUTIVE COMPLIANCE SUMMARY', margin + 5, y + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(26, 80, 54);
+    doc.text(`Overall Score: ${overallScore} / ${overallMaxScore} (${overallPercentage}%)`, margin + 5, y + 14);
+
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Analysis Date: ${formatDT(timestamp)}`, 15, y);
-    y += 5;
-    if (beforeUploadTime) {
-      doc.text(`Before Image Uploaded: ${formatDT(beforeUploadTime)}`, 15, y);
-      y += 5;
-    }
-    if (afterUploadTime) {
-      doc.text(`After Image Uploaded: ${formatDT(afterUploadTime)}`, 15, y);
-      y += 5;
-    }
-    y += 8;
+    doc.text(`Rating: ${overallRating.toUpperCase()}`, margin + 5, y + 21);
+    doc.text(`Critical Findings: ${enhancedSummary.criticalFindings}`, margin + 5, y + 27);
 
-    // Overview
-    checkPage(15);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text("Analysis Overview", 15, y);
-    y += 7;
-    addParagraph(data.overview, 10, "normal", [60, 60, 60], 15, 5);
+    const sumRightX = pageWidth / 2 + 10;
+    doc.text(`Highest Pillar: ${enhancedSummary.highestPillar}`, sumRightX, y + 14);
+    doc.text(`Lowest Pillar: ${enhancedSummary.lowestPillar}`, sumRightX, y + 20);
+    doc.text(`Image Quality: ${enhancedSummary.imageQualityScore !== null ? `${enhancedSummary.imageQualityScore}/100 (${enhancedSummary.imageQualityLevel})` : 'N/A'}`, sumRightX, y + 26);
+
+    y += 38;
+
+    // Pillar Scores
+    checkPageBreak(45);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.text('5S PILLAR SCORE BREAKDOWN', margin, y);
     y += 4;
-
-    // Lean Maintenance Score
-    checkPage(15);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text("Lean Maintenance Score", 15, y);
-    y += 7;
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(37, 99, 71);
-    doc.text(`${data.leanMaintenanceScore}%`, 15, y);
+    doc.line(margin, y, pageWidth - margin, y);
     y += 6;
-    if (data.leanMaintenanceExplanation) {
-      addParagraph(data.leanMaintenanceExplanation, 9, "normal", [60, 60, 60], 15, 4.5);
-      y += 4;
-    }
 
-    // 5S Scores
-    checkPage(20);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text("5S Category Scores", 15, y);
-    y += 8;
-
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.setFont("times", "bold");
-    doc.setTextColor(60, 60, 60);
-    doc.text("Category", 15, y);
-    doc.text("Before", 85, y);
-    doc.text("After", 105, y);
-    doc.text("Change", 125, y);
-    y += 6;
+    doc.setTextColor(100, 100, 100);
+    doc.text('Pillar', margin + 5, y);
+    doc.text('Score', margin + 60, y);
+    doc.text('Compliance', margin + 90, y);
+    doc.text('Rating', margin + 130, y);
+    y += 5;
 
-    PILLAR_META.forEach((cat) => {
-      checkPage(25);
-      const before = data.beforeScores[cat.key];
-      const after = data.afterScores[cat.key];
-      doc.setFont("times", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(40, 40, 40);
-      doc.text(`${cat.label} (${cat.jp})`, 15, y);
-      doc.setFont("times", "normal");
-      doc.text(`${before}%`, 85, y);
-      doc.text(`${after}%`, 105, y);
-      const delta = Math.round(after - before);
-      const deltaStr = delta > 0 ? `+${delta}%` : delta < 0 ? `${delta}%` : `±0%`;
-      doc.setTextColor(delta >= 0 ? 37 : 180, delta >= 0 ? 99 : 30, delta >= 0 ? 71 : 30);
-      doc.text(deltaStr, 125, y);
-      y += 5;
+    doc.setLineWidth(0.1);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 5;
 
-      // Explanations
-      if (data.beforeExplanations?.[cat.key]) {
-        addParagraph(`Before: ${data.beforeExplanations[cat.key]}`, 8, "normal", [100, 100, 100], 18, 3.5);
-        y += 1;
-      }
-      if (data.afterExplanations?.[cat.key]) {
-        addParagraph(`After: ${data.afterExplanations[cat.key]}`, 8, "normal", [100, 100, 100], 18, 3.5);
-        y += 1;
-      }
-      y += 2;
+    doc.setFont('helvetica', 'normal');
+    pillars.forEach((p) => {
+      doc.text(p.label, margin + 5, y);
+      doc.text(`${p.score} / ${p.maxScore}`, margin + 60, y);
+      doc.text(`${p.percentage}%`, margin + 90, y);
+      doc.text(p.rating, margin + 130, y);
+      y += 6;
     });
 
-    checkPage(15);
-    y += 3;
-    doc.setFont("times", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(40, 40, 40);
-    const overallDelta = Math.round(avgAfter - avgBefore);
-    const overallDeltaStr = overallDelta > 0 ? `+${overallDelta}%` : overallDelta < 0 ? `${overallDelta}%` : `±0%`;
-    doc.text(`Overall Score: ${avgBefore}% → ${avgAfter}% (${overallDeltaStr})`, 15, y);
-    y += 12;
+    y += 6;
+
+    // Strengths and Weaknesses
+    checkPageBreak(50);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.text('STRENGTHS & AREAS OF CONCERN', margin, y);
+    y += 4;
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(22, 101, 52);
+    doc.text('Overall Strengths:', margin, y);
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(80, 80, 80);
+    enhancedSummary.strengths.forEach((str) => {
+      doc.text(`• ${str}`, margin + 3, y);
+      y += 4.5;
+    });
+
+    y += 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(180, 83, 9);
+    doc.text('Areas of Concern / Weaknesses:', margin, y);
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(80, 80, 80);
+    enhancedSummary.weaknesses.forEach((weak) => {
+      doc.text(`• ${weak}`, margin + 3, y);
+      y += 4.5;
+    });
+
+    y += 6;
 
     // Recommendations
-    checkPage(20);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text("Recommendations", 15, y);
-    y += 8;
-    data.recommendations.forEach((rec) => {
-      addParagraph(`• ${rec}`, 10, "normal", [60, 60, 60], 15, 5);
+    if (recommendations && recommendations.length > 0) {
+      checkPageBreak(40);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      doc.text('CORRECTIVE ACTION RECOMMENDATIONS', margin, y);
+      y += 4;
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 6;
+
+      recommendations.forEach((rec, idx) => {
+        checkPageBreak(25);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(50, 50, 50);
+        doc.text(`${idx + 1}. [${rec.priority.toUpperCase()} ACTION] ${rec.problem}`, margin, y);
+        y += 4.5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(80, 80, 80);
+        
+        const recText = doc.splitTextToSize(`Recommendation: ${rec.recommendation}`, pageWidth - (margin * 2) - 5);
+        doc.text(recText, margin + 3, y);
+        y += (recText.length * 4);
+
+        const benefitText = `Expected Benefit: ${rec.expectedBenefit} | Est. Score Gain: +${rec.scoreGain} point(s)`;
+        doc.text(benefitText, margin + 3, y);
+        y += 7;
+      });
+    }
+
+    // Timeline Footer
+    if (timeline) {
+      checkPageBreak(35);
       y += 2;
-    });
-
-    // Improvements
-    if (data.improvements.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      doc.text('AUDIT LOG TIMELINE', margin, y);
       y += 4;
-      checkPage(20);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.setTextColor(40, 40, 40);
-      doc.text("Key Improvements Observed", 15, y);
-      y += 8;
-      data.improvements.forEach((imp) => {
-        addParagraph(`• ${imp}`, 10, "normal", [60, 60, 60], 15, 5);
-        y += 2;
-      });
-    }
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 6;
 
-    // Root Cause Observations
-    if (data.rootCauseObservations && data.rootCauseObservations.length > 0) {
-      y += 4;
-      checkPage(20);
-      doc.setFont("times", "bold");
-      doc.setFontSize(13);
-      doc.setTextColor(40, 40, 40);
-      doc.text("Root Cause Observations", 15, y);
-      y += 8;
-      data.rootCauseObservations.forEach((obs) => {
-        addParagraph(`• ${obs}`, 10, "normal", [60, 60, 60], 15, 5);
-        y += 2;
-      });
-    }
-
-    // Safety Recommendations
-    if (data.safetyRecommendations && data.safetyRecommendations.length > 0) {
-      y += 4;
-      checkPage(20);
-      doc.setFont("times", "bold");
-      doc.setFontSize(13);
-      doc.setTextColor(40, 40, 40);
-      doc.text("Safety Compliance Recommendations", 15, y);
-      y += 8;
-      data.safetyRecommendations.forEach((sec) => {
-        addParagraph(`• ${sec}`, 10, "normal", [60, 60, 60], 15, 5);
-        y += 2;
-      });
-    }
-
-    // Footer
-    const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setFont("times", "italic");
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text("© 2026 ARCOLAB — 5S Workplace Analysis", pageWidth / 2, 287, { align: "center" });
-      doc.text(`Page ${i} of ${totalPages}`, pageWidth - 15, 287, { align: "right" });
+      doc.setTextColor(120, 120, 120);
+
+      const formatTS = (iso: string | null) => {
+        if (!iso) return 'N/A';
+        return new Date(iso).toLocaleString();
+      };
+
+      doc.text(`Image Uploaded: ${formatTS(timeline.imageUploaded)}`, margin + 2, y); y += 4;
+      doc.text(`Validation Completed: ${formatTS(timeline.validationComplete)}`, margin + 2, y); y += 4;
+      doc.text(`Audit Started: ${formatTS(timeline.auditStarted)}`, margin + 2, y); y += 4;
+      doc.text(`Audit Completed: ${formatTS(timeline.auditCompleted)}`, margin + 2, y);
     }
 
-    doc.save("ArcoLabs-5S-Analysis-Report.pdf");
+    doc.save(`5S-Audit-Report-${areaInfo.areaName.replace(/\s+/g, '-')}-${areaInfo.auditDate.replace(/\s+/g, '-')}.pdf`);
   };
 
+
   return (
-    <div className="space-y-8">
-      {/* Timestamp */}
-      <div className="bg-muted/50 rounded-lg border border-border px-5 py-3 space-y-1 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary flex-shrink-0" />
-          <span>Analysis performed: <span className="font-semibold text-foreground">{formatDT(timestamp)}</span></span>
+    <div className="space-y-8 font-sans">
+      {/* 11. Audit Progress Stepper */}
+      <AuditProgressStepper currentStep={6} />
+
+      {/* Industrial Audit Header */}
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm print:border-none print:shadow-none">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-xl">
+              AL
+            </div>
+            <div className="text-center sm:text-left">
+              <h1 className="text-xl font-black tracking-tight text-foreground uppercase">
+                ARCOLAB 5S Workplace Audit
+              </h1>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mt-0.5">
+                Digital Auditor Compliance Report
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 no-print">
+            <button
+              onClick={handleDownloadPDF}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download Report
+            </button>
+            <button
+              onClick={() => setDevMode(!devMode)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                devMode
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
+            >
+              <Terminal className="h-3.5 w-3.5" />
+              Dev Mode
+            </button>
+          </div>
         </div>
-        {beforeUploadTime &&
-        <div className="flex items-center gap-2 pl-6">
-            <span>Before image uploaded: <span className="font-semibold text-foreground">{formatDT(beforeUploadTime)}</span></span>
+
+        {/* Area Information Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 text-xs">
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Company</p>
+            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.companyName}</p>
           </div>
-        }
-        {afterUploadTime &&
-        <div className="flex items-center gap-2 pl-6">
-            <span>After image uploaded: <span className="font-semibold text-foreground">{formatDT(afterUploadTime)}</span></span>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Date Conducted</p>
+            <p className="font-bold text-foreground mt-0.5">{areaInfo.auditDate}</p>
           </div>
-        }
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Area / Workstation</p>
+            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.areaName}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Auditor</p>
+            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.auditor}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/40 mt-4 text-xs">
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Department</p>
+            <p className="font-semibold text-foreground mt-0.5">{areaInfo.department}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Industry</p>
+            <p className="font-semibold text-foreground mt-0.5">{areaInfo.industry}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Workspace Type</p>
+            <p className="font-semibold text-foreground mt-0.5">{areaInfo.workspaceType}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Scoring Standard</p>
+            <p className="font-semibold text-foreground mt-0.5">Physical Audit 5S (0-4 Rating)</p>
+          </div>
+        </div>
       </div>
 
-      {/* Overview */}
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-        <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          Analysis Overview
-        </h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">{data.overview}</p>
+      {/* 2. Executive Summary - Promoted to the top section of the report */}
+      <div className="print:break-inside-avoid">
+        <AuditSummaryCard summary={enhancedSummary} />
       </div>
 
-      {/* Lean Maintenance Score with Explanation */}
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Wrench className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-heading font-semibold text-card-foreground">Lean Maintenance Score</h3>
-        </div>
-        <div className="flex items-end gap-3 mb-3">
-          <span className={`text-3xl font-bold ${getScoreColor(data.leanMaintenanceScore)}`}>{data.leanMaintenanceScore}%</span>
-        </div>
-        <div className="h-2.5 bg-muted rounded-full overflow-hidden mb-4">
-          <div className={`h-full rounded-full ${getBarBg(data.leanMaintenanceScore)}`} style={{ width: `${data.leanMaintenanceScore}%` }} />
-        </div>
-        {data.leanMaintenanceExplanation &&
-        <div className="bg-muted/40 rounded-lg p-4 border border-border">
-            <p className="text-sm text-muted-foreground leading-relaxed flex gap-2">
-              <Info className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-              <span>{data.leanMaintenanceExplanation}</span>
+      {/* 3. Interactive Pillar Navigation */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print">
+        {pillars.map((pillar) => (
+          <PillarCard
+            key={pillar.name}
+            pillarKey={pillar.name as AuditPillar}
+            label={pillar.label}
+            jpName={pillar.jpName}
+            score={pillar.score}
+            maxScore={pillar.maxScore}
+            percentage={pillar.percentage}
+            rating={pillar.rating}
+          />
+        ))}
+      </div>
+
+      {/* Split layout: Sticky Image Preview + Detailed Assessments */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* 4. Display the Uploaded Image During Assessment */}
+        <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
+                Workplace Audit Evidence
+              </h4>
+              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                Audited State
+              </span>
+            </div>
+            <div className="relative group overflow-hidden rounded-lg border border-border bg-muted">
+              <img
+                src={workplaceImage.replace(/^__geo:[^_]*__/, "")}
+                alt="Audited Workspace"
+                className="w-full h-auto max-h-96 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
+              Verify questions below against this active visual record.
             </p>
           </div>
-        }
-        <div className="mt-4 pt-4 border-t border-border">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            <span className="font-semibold text-foreground">Lean Maintenance</span> focuses on preventing equipment problems, keeping machines clean and organised, reducing downtime, and improving overall efficiency through TPM (Total Productive Maintenance) practices.
-          </p>
         </div>
-      </div>
 
-      {/* Digital Governance Information */}
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-heading font-semibold text-card-foreground">Digital Governance</h3>
-        </div>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          Digital Governance uses digital tools to monitor, control, and ensure workplace standards are followed consistently across all departments.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-          "Date & time of photo upload",
-          "User / department details",
-          "Location or area name",
-          "Before–after comparison history",
-          "5S score records & audit trail",
-          "Monthly reports & manager approval"].
-          map((item, i) =>
-          <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-              <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-              <span>{item}</span>
+        {/* Detailed Assessments */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between no-print">
+              <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
+                Detailed Pillar Checklist
+              </h3>
+              <span className="text-[10px] text-muted-foreground font-semibold">
+                Click any row below to review observations
+              </span>
             </div>
-          )}
-        </div>
-        <div className="mt-4 pt-4 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            This ensures <span className="font-semibold text-foreground">accountability</span>, <span className="font-semibold text-foreground">transparency</span>, and <span className="font-semibold text-foreground">continuous monitoring</span> of workplace standards.
-          </p>
+            {pillars.map((pillar) => (
+              <PillarAssessment
+                key={pillar.name}
+                pillarKey={pillar.name as AuditPillar}
+                label={pillar.label}
+                jpName={pillar.jpName}
+                score={pillar.score}
+                maxScore={pillar.maxScore}
+                percentage={pillar.percentage}
+                rating={pillar.rating}
+                questions={pillar.questions}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Before/After Comparison Slider */}
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-        <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          Before vs After Comparison
-        </h3>
-        <BeforeAfterComparison
-          beforeImage={beforeImage}
-          afterImage={afterImage}
-          beforeScore={avgBefore}
-          afterScore={avgAfter}
+      {/* Print-only layout for Workplace Image */}
+      <div className="hidden print:block space-y-3 my-8">
+        <h4 className="text-xs font-black uppercase tracking-wider text-foreground border-b border-border pb-1">
+          Workplace Image Audit Evidence
+        </h4>
+        <img
+          src={workplaceImage.replace(/^__geo:[^_]*__/, "")}
+          alt="Audited Workspace Evidence"
+          className="w-full h-auto max-h-[400px] object-contain rounded-lg border border-border"
         />
       </div>
 
-      {/* 5S Scores with expandable explanation cards */}
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-        <h3 className="text-lg font-heading font-semibold text-card-foreground mb-6">5S Category Scores</h3>
-        <div className="space-y-3">
-          {PILLAR_META.map((pillar) => (
-            <ScoreExplanationCard
-              key={pillar.key}
-              pillar={pillar}
-              beforeScore={data.beforeScores[pillar.key]}
-              afterScore={data.afterScores[pillar.key]}
-              beforeExplanation={data.beforeExplanations?.[pillar.key]}
-              afterExplanation={data.afterExplanations?.[pillar.key]}
-              defaultExpanded={false}
-            />
-          ))}
-        </div>
-        <div className="mt-6 pt-6 border-t border-border flex items-center justify-between">
-          <span className="font-heading font-semibold text-foreground">Overall Score</span>
-          <div className="flex items-center gap-3">
-            <span className={`text-xl font-bold ${getScoreColor(avgBefore)}`}>{avgBefore}%</span>
-            <span className="text-muted-foreground">→</span>
-            <span className={`text-xl font-bold ${getScoreColor(avgAfter)}`}>{avgAfter}%</span>
-          </div>
-        </div>
+      {/* Overall score section */}
+      <div className="print:break-inside-avoid">
+        <AuditScoreCard
+          score={overallScore}
+          maxScore={overallMaxScore}
+          percentage={overallPercentage}
+          rating={overallRating}
+        />
       </div>
 
-      {/* CV Metrics Panel (hidden) */}
-      {false && (data.beforeMetrics || data.afterMetrics) && (
-        <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Raw CV Metrics
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Intermediate metrics from the YOLOv8 + OpenCV engine that determined the scores above.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { label: "Clutter Objects", before: data.beforeMetrics?.clutter_count, after: data.afterMetrics?.clutter_count, lowerIsBetter: true },
-              { label: "Alignment Score", before: data.beforeMetrics?.alignment_score !== undefined ? `${(data.beforeMetrics.alignment_score * 100).toFixed(0)}%` : undefined, after: data.afterMetrics?.alignment_score !== undefined ? `${(data.afterMetrics.alignment_score * 100).toFixed(0)}%` : undefined },
-              { label: "Brightness", before: data.beforeMetrics?.brightness_mean?.toFixed(0), after: data.afterMetrics?.brightness_mean?.toFixed(0) },
-              { label: "Dirt Blobs", before: data.beforeMetrics?.dirt_proxy_count, after: data.afterMetrics?.dirt_proxy_count, lowerIsBetter: true },
-              { label: "Color Uniformity", before: data.beforeMetrics?.color_uniformity !== undefined ? `${(data.beforeMetrics.color_uniformity * 100).toFixed(0)}%` : undefined, after: data.afterMetrics?.color_uniformity !== undefined ? `${(data.afterMetrics.color_uniformity * 100).toFixed(0)}%` : undefined },
-              { label: "Objects Detected", before: data.beforeMetrics?.object_count, after: data.afterMetrics?.object_count },
-            ]
-              .filter((m) => m.before !== undefined || m.after !== undefined)
-              .map((metric) => (
-                <div key={metric.label} className="bg-muted/40 rounded-lg p-3 border border-border">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">{metric.label}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{metric.before ?? "—"}</span>
-                    <span className="text-muted-foreground text-xs">→</span>
-                    <span className="text-sm font-semibold text-foreground">{metric.after ?? "—"}</span>
-                  </div>
+      {/* Radar Chart */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch print:break-inside-avoid">
+        <div className="md:col-span-1 flex flex-col justify-between space-y-4">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex-1 flex flex-col justify-center">
+            <h4 className="text-xs font-black uppercase tracking-wider text-foreground border-b border-border pb-2 mb-3">
+              Score Breakdown
+            </h4>
+            <div className="space-y-3 text-xs">
+              {pillars.map((p) => (
+                <div key={p.name} className="flex justify-between items-center">
+                  <span className="text-muted-foreground font-semibold">{p.label}</span>
+                  <span className="font-mono font-bold text-foreground">{p.score} / 16</span>
                 </div>
               ))}
+            </div>
           </div>
-          {data.scoringMethod && (
-            <p className="text-[10px] text-muted-foreground mt-4 pt-3 border-t border-border">
-              <span className="font-semibold">Scoring engine:</span> {data.scoringMethod}
-            </p>
-          )}
         </div>
-      )}
-
-      {/* Recommendations */}
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-        <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-warning" />
-          Recommendations
-        </h3>
-        <ul className="space-y-3">
-          {data.recommendations.map((rec, i) =>
-          <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-              <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-semibold">{i + 1}</span>
-              {rec}
-            </li>
-          )}
-        </ul>
+        <div className="md:col-span-2">
+          <RadarScoreChart pillars={pillars} />
+        </div>
       </div>
 
-      {/* Key Improvements */}
-      {data.improvements.length > 0 &&
-      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-primary" />
-            Key Improvements Observed
-          </h3>
-          <ul className="space-y-2">
-            {data.improvements.map((imp, i) =>
-          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                {imp}
-              </li>
-          )}
-          </ul>
-        </div>
-      }
+      {/* Centralized Improvement Recommendations */}
+      <div className="space-y-3 print:break-inside-avoid">
+        <h3 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          Improvement Recommendations
+        </h3>
+        <RecommendationCard recommendations={recommendations} />
+      </div>
 
-      {/* Root Cause Observations */}
-      {data.rootCauseObservations && data.rootCauseObservations.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-            <Search className="h-5 w-5 text-amber-500" />
-            Root Cause Observations
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Lean engineering analysis of underlying factors contributing to identified shop-floor wastes.
-          </p>
-          <ul className="space-y-3">
-            {data.rootCauseObservations.map((obs, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-xs flex items-center justify-center font-semibold">{i + 1}</span>
-                {obs}
-              </li>
-            ))}
-          </ul>
+      {/* Audit Timeline */}
+      {timeline && (
+        <div className="print:break-inside-avoid">
+          <AuditTimelineComponent timeline={timeline} />
         </div>
       )}
 
-      {/* Safety Recommendations */}
-      {data.safetyRecommendations && data.safetyRecommendations.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
-          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-500" />
-            Safety Compliance Recommendations
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Critical safety measures aligned with occupational standards to eliminate occupational hazards in the Gemba.
-          </p>
-          <ul className="space-y-3">
-            {data.safetyRecommendations.map((sec, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
-                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs flex items-center justify-center font-semibold">{i + 1}</span>
-                {sec}
-              </li>
-            ))}
-          </ul>
+      {/* PDF Download Button */}
+      <div className="flex gap-3 no-print">
+        <button
+          onClick={handleDownloadPDF}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shadow-primary/10 cursor-pointer"
+        >
+          <Download className="h-5 w-5" />
+          Download PDF Report
+        </button>
+      </div>
+
+      {/* Developer Mode widgets */}
+      {devMode && (
+        <div className="bg-card border border-destructive/20 rounded-xl p-5 space-y-4 font-mono text-xs no-print">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <h4 className="font-bold text-destructive flex items-center gap-1.5">
+              <Terminal className="h-4 w-4" />
+              AI Developer Telemetry
+            </h4>
+            <span className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded font-bold">
+              DEV ONLY
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase">Vision Model</p>
+              <p className="text-foreground mt-0.5 font-mono">{data.vision_model}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase">Prompt Version</p>
+              <p className="text-foreground mt-0.5 font-mono">v{data.prompt_version}</p>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase">Raw JSON Payload</p>
+            <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+          </div>
         </div>
       )}
-
-      {/* Download */}
-      <button
-        onClick={downloadPdf}
-        className="w-full flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3.5 text-base font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm">
-
-        <Download className="h-5 w-5" />
-        Download PDF Report
-      </button>
-    </div>);
-
-};
-
-export default AnalysisResults;
+    </div>
+  );
+}

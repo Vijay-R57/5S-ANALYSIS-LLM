@@ -1,0 +1,34 @@
+[
+  {
+    "category": "Obstructions",
+    "finding": "Pallet blocking emergency fire door",
+    "status": "NON_COMPLIANT",
+    "evidence": "A wooden pallet is placed directly in front of the fire door, preventing emergency egress.",
+    "location": "rear-left",
+    "detected_objects": ["wooden pallet", "fire door"],
+    "safety_equipment": [],
+    "hazards": ["blocked emergency exit"],
+    "obstructions": ["blocked emergency fire door"],
+    "cleanliness_rating": "NOT_VISIBLE",
+    "floor_markings": false,
+    "storage_present": null,
+    "labels_visible": null,
+    "confidence": 0.97
+  },
+  {
+    "category": "Cleanliness",
+    "finding": "Dust and debris on workbench",
+    "status": "NON_COMPLIANT",
+    "evidence": "There is a noticeable layer of metallic dust on workbench surface.",
+    "location": "center bench",
+    "detected_objects": ["workbench", "metallic dust"],
+    "safety_equipment": [],
+    "hazards": [],
+    "obstructions": [],
+    "cleanliness_rating": "DIRTY",
+    "floor_markings": null,
+    "storage_present": true,
+    "labels_visible": true,
+    "confidence": 0.92
+  }
+]

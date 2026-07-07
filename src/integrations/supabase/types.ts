@@ -113,6 +113,311 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          version: string
+          status: 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED'
+          is_default: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          version?: string
+          status?: 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED'
+          is_default?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          version?: string
+          status?: 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED'
+          is_default?: boolean
+          created_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_checklist_items: {
+        Row: {
+          id: string
+          template_id: string
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          question_id: string | null
+          question_text: string
+          description: string | null
+          max_points: number
+          weight: number
+          display_order: number
+          is_mandatory: boolean
+          severity: 'CRITICAL' | 'MAJOR' | 'MINOR'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          question_id?: string | null
+          question_text: string
+          description?: string | null
+          max_points?: number
+          weight?: number
+          display_order?: number
+          is_mandatory?: boolean
+          severity?: 'CRITICAL' | 'MAJOR' | 'MINOR'
+          created_at?: string
+        }
+        Update: {
+          pillar?: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          question_id?: string | null
+          question_text?: string
+          description?: string | null
+          max_points?: number
+          weight?: number
+          display_order?: number
+          is_mandatory?: boolean
+          severity?: 'CRITICAL' | 'MAJOR' | 'MINOR'
+        }
+        Relationships: []
+      }
+      audit_sessions: {
+        Row: {
+          id: string
+          audit_number: string
+          template_id: string
+          template_name: string
+          template_version: string
+          auditor_id: string
+          auditor_name: string
+          area_id: string | null
+          area_name: string | null
+          department_name: string | null
+          plant_name: string | null
+          analysis_log_id: string | null
+          audit_date: string
+          status: 'DRAFT' | 'IN_PROGRESS' | 'UNDER_REVIEW' | 'COMPLETED' | 'ARCHIVED'
+          total_score: number
+          max_score: number
+          percentage: number
+          notes: string | null
+          // Phase 2 fields
+          score_breakdown: Json | null
+          generated_after_image_url: string | null
+          improvement_prompt: string | null
+          prompt_version_id: string | null
+          vision_model_used: string | null
+          prompt_schema_version: string | null
+          analysis_mode: 'MANUAL' | 'AI_ASSISTED' | 'FULL_AI'
+          completed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          template_name: string
+          template_version: string
+          auditor_id: string
+          auditor_name: string
+          area_id?: string | null
+          area_name?: string | null
+          department_name?: string | null
+          plant_name?: string | null
+          analysis_log_id?: string | null
+          audit_date?: string
+          status?: 'DRAFT' | 'IN_PROGRESS' | 'UNDER_REVIEW' | 'COMPLETED' | 'ARCHIVED'
+          notes?: string | null
+          analysis_mode?: 'MANUAL' | 'AI_ASSISTED' | 'FULL_AI'
+        }
+        Update: {
+          status?: 'DRAFT' | 'IN_PROGRESS' | 'UNDER_REVIEW' | 'COMPLETED' | 'ARCHIVED'
+          notes?: string | null
+          total_score?: number
+          max_score?: number
+          score_breakdown?: Json | null
+          generated_after_image_url?: string | null
+          improvement_prompt?: string | null
+          prompt_version_id?: string | null
+          vision_model_used?: string | null
+          prompt_schema_version?: string | null
+          analysis_mode?: 'MANUAL' | 'AI_ASSISTED' | 'FULL_AI'
+          completed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_session_items: {
+        Row: {
+          id: string
+          audit_session_id: string
+          original_checklist_item_id: string | null
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          question_id: string | null
+          question_text: string
+          description: string | null
+          max_points: number
+          weight: number
+          display_order: number
+          is_mandatory: boolean
+          severity: 'CRITICAL' | 'MAJOR' | 'MINOR'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          audit_session_id: string
+          original_checklist_item_id?: string | null
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          question_id?: string | null
+          question_text: string
+          description?: string | null
+          max_points?: number
+          weight?: number
+          display_order?: number
+          is_mandatory?: boolean
+          severity?: 'CRITICAL' | 'MAJOR' | 'MINOR'
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      audit_item_responses: {
+        Row: {
+          id: string
+          audit_session_id: string
+          session_item_id: string
+          manual_score: number | null
+          // Phase 2: ai_score replaced by ai_answer enum
+          ai_answer: 'YES' | 'NO' | 'PARTIAL' | 'NOT_VISIBLE' | 'NOT_APPLICABLE' | null
+          evidence: string | null
+          ai_question_id: string | null
+          final_score: number | null
+          confidence: number | null  // metadata only — never used in scoring
+          reviewer_comment: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          audit_session_id: string
+          session_item_id: string
+          manual_score?: number | null
+          ai_answer?: 'YES' | 'NO' | 'PARTIAL' | 'NOT_VISIBLE' | 'NOT_APPLICABLE' | null
+          evidence?: string | null
+          ai_question_id?: string | null
+          final_score?: number | null
+          confidence?: number | null
+          reviewer_comment?: string | null
+          notes?: string | null
+        }
+        Update: {
+          manual_score?: number | null
+          ai_answer?: 'YES' | 'NO' | 'PARTIAL' | 'NOT_VISIBLE' | 'NOT_APPLICABLE' | null
+          evidence?: string | null
+          ai_question_id?: string | null
+          final_score?: number | null
+          confidence?: number | null
+          reviewer_comment?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_critical_rules: {
+        Row: {
+          id: string
+          template_id: string | null
+          checklist_item_id: string
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          trigger_answer: 'YES' | 'NO' | 'PARTIAL' | 'NOT_VISIBLE' | 'NOT_APPLICABLE'
+          score_cap: number
+          description: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          template_id?: string | null
+          checklist_item_id: string
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          trigger_answer?: 'YES' | 'NO' | 'PARTIAL' | 'NOT_VISIBLE' | 'NOT_APPLICABLE'
+          score_cap: number
+          description?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          is_active?: boolean
+          score_cap?: number
+          description?: string | null
+        }
+        Relationships: []
+      }
+      audit_prompt_versions: {
+        Row: {
+          id: string
+          prompt_type: string
+          version: string
+          vision_model: string
+          temperature: number
+          schema_version: string
+          prompt_text: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          prompt_type: string
+          version?: string
+          vision_model?: string
+          temperature?: number
+          schema_version?: string
+          prompt_text: string
+          is_active?: boolean
+        }
+        Update: {
+          is_active?: boolean
+          prompt_text?: string
+        }
+        Relationships: []
+      }
+      audit_recommendations: {
+        Row: {
+          id: string
+          audit_session_id: string
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          severity: 'CRITICAL' | 'MAJOR' | 'MINOR'
+          priority: number
+          title: string
+          description: string
+          root_cause: string | null
+          corrective_action: string | null
+          linked_question_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          audit_session_id: string
+          pillar: 'SORT' | 'SET_IN_ORDER' | 'SHINE' | 'STANDARDIZE' | 'SUSTAIN'
+          severity?: 'CRITICAL' | 'MAJOR' | 'MINOR'
+          priority?: number
+          title: string
+          description: string
+          root_cause?: string | null
+          corrective_action?: string | null
+          linked_question_id?: string | null
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -248,6 +553,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      audit_answer_state: ['YES', 'NO', 'PARTIAL', 'NOT_VISIBLE', 'NOT_APPLICABLE'] as const,
+      audit_severity:     ['CRITICAL', 'MAJOR', 'MINOR'] as const,
+      audit_pillar:       ['SORT', 'SET_IN_ORDER', 'SHINE', 'STANDARDIZE', 'SUSTAIN'] as const,
+    },
   },
 } as const

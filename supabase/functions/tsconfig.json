@@ -9,6 +9,7 @@
         "types": [
             "@types/deno"
         ],
+        "allowImportingTsExtensions": true,
         "plugins": [
             {
                 "name": "typescript-deno-plugin",

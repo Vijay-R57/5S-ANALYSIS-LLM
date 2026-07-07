@@ -7,6 +7,7 @@ import logo from "@/assets/logo-new.png";
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/analysis", label: "5S Analysis" },
+  { to: "/audit", label: "Audit" },
   { to: "/lean-maintenance", label: "Lean Maintenance" },
   { to: "/history", label: "History" },
   { to: "/about", label: "About" },

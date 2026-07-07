@@ -1,0 +1,28 @@
+[
+  {
+    "pillar": "SHINE",
+    "severity": "MAJOR",
+    "priority_label": "High Priority",
+    "priority": 2,
+    "title": "Clean Workbench Dust",
+    "problem": "Metallic dust accumulation on center workbench.",
+    "root_cause": "Absence of dust collector hood.",
+    "corrective_action": "Install suction hood and wipe down workbench daily.",
+    "expected_benefit": "Prevents dust inhalation, improves shine rating.",
+    "estimated_impact": "+8% on Shine",
+    "linked_question_id": "ASM_SHN_01"
+  },
+  {
+    "pillar": "SORT",
+    "severity": "CRITICAL",
+    "priority_label": "Immediate Action",
+    "priority": 1,
+    "title": "Clear blocked fire exit",
+    "problem": "Wooden pallet blocks emergency egress door.",
+    "root_cause": "Improper staging during shift change.",
+    "corrective_action": "Relocate pallet to pallet rack and brief team on exit clearance rules.",
+    "expected_benefit": "Restores safety egress compliance.",
+    "estimated_impact": "Critical safety cap resolved",
+    "linked_question_id": "ASM_SRT_01"
+  }
+]

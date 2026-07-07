@@ -1,137 +1,174 @@
 /**
  * src/types/analysis.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Single source of truth for all analysis-related TypeScript types.
- * Mirrors the FastAPI CV Engine's Pydantic response schema exactly.
+ * Single source of truth for analysis-related types.
+ * Phase 3A: Removed after-image fields; added ImageValidationResult.
  */
 
-// ── Per-pillar scores (0-100 after conversion from /20) ─────────────────────
-export interface FiveSScore {
-  sort: number;
-  setInOrder: number;
-  shine: number;
-  standardize: number;
-  sustain: number;
+import type { AuditPillar } from '@/modules/audit/constants/pillars';
+
+// ── Answer State (mirrors DB enum audit_answer_state) ─────────────────────────
+export type AuditAnswerState =
+  | 'YES'
+  | 'NO'
+  | 'PARTIAL'
+  | 'NOT_VISIBLE'
+  | 'NOT_APPLICABLE';
+
+export type Severity = 'CRITICAL' | 'MAJOR' | 'MINOR';
+
+// ── Per-question AI response ──────────────────────────────────────────────────
+export interface AuditQuestionResponse {
+  question_id:  string;
+  ai_answer:    AuditAnswerState;
+  confidence:   number;   // metadata only — never used in scoring
+  evidence:     string;   // observation supporting the answer
 }
 
-// ── Natural-language explanations for each pillar ────────────────────────────
-export interface ScoreExplanations {
-  sort: string;
-  setInOrder: string;
-  shine: string;
-  standardize: string;
-  sustain: string;
+// ── Explainability detail per deduction ──────────────────────────────────────
+export interface DeductionDetail {
+  question_id:   string;
+  question_text: string;
+  severity:      Severity;
+  evidence:      string;
+  points_lost:   number;
 }
 
-// ── Raw CV metrics from the Python engine ────────────────────────────────────
-export interface CVMetrics {
-  clutter_count: number;
-  object_count: number;
-  clutter_density: number;
-  obstruction_ratio: number;
-  unused_material_presence: number;
-  alignment_score: number;
-  spacing_consistency: number;
-  edge_alignment: number;
-  organization_symmetry: number;
-  brightness_mean: number;
-  brightness_std: number;
-  brightness_consistency: number;
-  dirt_proxy_count: number;
-  texture_irregularity: number;
-  edge_cleanliness: number;
-  edge_density: number;
-  color_uniformity: number;
-  visual_consistency: number;
-  workplace_std_dev: number;
+// ── Per-pillar score result ───────────────────────────────────────────────────
+export interface PillarScoreResult {
+  pillar:         AuditPillar;
+  score:          number;
+  maximum:        number;
+  percentage:     number;
+  raw_percentage: number;
+  passed:         number;
+  partial:        number;
+  failed:         number;
+  not_visible:    number;
+  not_applicable: number;
+  critical:       number;         // count of CRITICAL severity failures
+  cap_applied:    boolean;
+  cap_value?:     number;
+  cap_reason?:    string;
+  top_deductions: DeductionDetail[];
 }
 
-// ── Top-level analysis result (matches edge function response) ───────────────
-export interface AnalysisData {
-  overview: string;
-  beforeScores: FiveSScore;
-  afterScores: FiveSScore;
-  beforeExplanations: ScoreExplanations;
-  afterExplanations: ScoreExplanations;
-  recommendations: string[];
-  improvements: string[];
-  rootCauseObservations?: string[];
-  safetyRecommendations?: string[];
-  leanMaintenanceScore: number;
-  leanMaintenanceScoreAfter?: number;
-  leanMaintenanceExplanation: string;
-  scoringMethod?: string;
-  rawScoringMethod?: string;
-  beforeMetrics?: CVMetrics;
-  afterMetrics?: CVMetrics;
+// ── Full session score ────────────────────────────────────────────────────────
+export interface SessionScoreResult {
+  pillar_scores:       PillarScoreResult[];
+  overall_score:       number;
+  overall_maximum:     number;
+  overall_percentage:  number;
+  grade:               string;
+  grade_color:         string;
+  total_answered:      number;
+  total_questions:     number;
+  critical_failures:   number;
+  computed_at:         string;
+}
+
+// ── Recommendation ────────────────────────────────────────────────────────────
+export interface AuditRecommendation {
+  pillar:             string;
+  severity:           Severity;
+  priority:           number;
+  priority_label?:    'Immediate Action' | 'High Priority' | 'Medium Priority' | 'Long-Term Improvement';
+  title:              string;
+  description:        string;
+  problem?:           string;
+  root_cause:         string;
+  corrective_action:  string;
+  expected_benefit?:  string;
+  estimated_impact?:  string;
+  linked_question_id: string;
+}
+
+// ── Full analysis result (edge function response) ────────────────────────────
+export interface AuditAnalysisResult {
+  template: {
+    id:      string;
+    name:    string;
+    version: string;
+  };
+  prompt_version:    string;
+  vision_model:      string;
+  schema_version:    string;
+  audit_confidence:  number;
+  before: {
+    score:     SessionScoreResult;
+    responses: AuditQuestionResponse[];
+  };
+  /** Phase 3A: after-image removed from primary workflow. Field kept for
+   *  backward-compat with history records; always null in new audits. */
+  after?: {
+    image_base64: string;
+    score:        SessionScoreResult;
+    responses:    AuditQuestionResponse[];
+  } | null;
+  recommendations:    AuditRecommendation[];
+  improvement_prompt: string | null;
+  explainability_report?: unknown;
+  scoringMethod?:     string;
+}
+
+// ── Image Validation (Phase 3A) ───────────────────────────────────────────────
+
+export type ImageQualityLevel = 'Excellent' | 'Good' | 'Fair' | 'Poor';
+
+export interface ImageValidationCheck {
+  pass:   boolean;
+  points: number;
+  detail: string;
+}
+
+export interface ImageValidationResult {
+  /** false = at least one CRITICAL check failed; audit blocked */
+  passed:           boolean;
+  /** 0–100 composite quality score */
+  qualityScore:     number;
+  qualityLevel:     ImageQualityLevel;
+  checks: {
+    resolution: ImageValidationCheck & { width: number; height: number };
+    brightness: ImageValidationCheck & { value: number };
+    sharpness:  ImageValidationCheck & { value: number };
+    fileSize:   ImageValidationCheck & { sizeKb: number };
+    format:     ImageValidationCheck & { mimeType: string };
+  };
+  /** Blocking failures — non-empty means Start button is disabled */
+  criticalFailures: string[];
+  /** Advisory warnings — non-empty shows caution but audit allowed */
+  warnings:         string[];
 }
 
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
-  | "idle"
-  | "compressing"
-  | "checking-cache"
-  | "analyzing"
-  | "saving"
-  | "complete"
-  | "error";
+  | 'idle'
+  | 'compressing'
+  | 'loading-template'
+  | 'analyzing-sort'
+  | 'analyzing-set-in-order'
+  | 'analyzing-shine'
+  | 'analyzing-standardize'
+  | 'analyzing-sustain'
+  | 'scoring'
+  | 'recommendations'
+  | 'saving'
+  | 'preparing-report'
+  | 'complete'
+  | 'error';
 
 export interface AnalysisPipelineState {
-  stage: AnalysisStage;
-  progress: number;          // 0–100
-  message: string;
+  stage:      AnalysisStage;
+  progress:   number;   // 0–100
+  message:    string;
   retryCount: number;
 }
 
-// ── Pillar metadata ───────────────────────────────────────────────────────────
-export interface PillarMeta {
-  key: keyof FiveSScore;
-  label: string;
-  jp: string;
-  desc: string;
-  icon: string;             // emoji shorthand
-  factors: string[];        // sub-factors measured
+// ── Audit Timeline (Phase 3A) ─────────────────────────────────────────────────
+export interface AuditTimeline {
+  imageUploaded:      string | null;
+  validationComplete: string | null;
+  auditStarted:       string | null;
+  auditCompleted:     string | null;
+  reportGenerated:    string | null;
 }
-
-export const PILLAR_META: PillarMeta[] = [
-  {
-    key: "sort",
-    label: "Sort",
-    jp: "Seiri",
-    desc: "Removing unnecessary items from the workspace",
-    icon: "🗂️",
-    factors: ["Clutter count", "Clutter density", "Obstruction ratio", "Unused material presence"],
-  },
-  {
-    key: "setInOrder",
-    label: "Set in Order",
-    jp: "Seiton",
-    desc: "Organising all remaining items systematically",
-    icon: "📐",
-    factors: ["Object alignment", "Spacing consistency", "Edge alignment", "Organisation symmetry"],
-  },
-  {
-    key: "shine",
-    label: "Shine",
-    jp: "Seiso",
-    desc: "Cleaning and maintaining the workspace",
-    icon: "✨",
-    factors: ["Brightness consistency", "Dirt proxy detection", "Texture irregularity", "Edge cleanliness"],
-  },
-  {
-    key: "standardize",
-    label: "Standardize",
-    jp: "Seiketsu",
-    desc: "Creating and enforcing workplace standards",
-    icon: "📋",
-    factors: ["Visual consistency", "Color uniformity", "Workplace std deviation", "Visual compliance"],
-  },
-  {
-    key: "sustain",
-    label: "Sustain",
-    jp: "Shitsuke",
-    desc: "Maintaining discipline and continuous improvement",
-    icon: "🔄",
-    factors: ["Historical consistency", "Compliance trends", "Previous audit comparison", "Discipline index"],
-  },
-];

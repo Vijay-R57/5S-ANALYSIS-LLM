@@ -1,53 +1,30 @@
 /**
  * src/hooks/useAnalysisPipeline.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Production-grade analysis pipeline hook.
+ * AI-Driven 5S Audit analysis pipeline hook (Phase 2).
  *
- * Features:
- *  • Typed Pydantic-mirrored response schema
- *  • Stage-aware progress (compressing → cache → analyzing → saving → complete)
- *  • Response validation — rejects malformed payloads before they reach the UI
- *  • Retry up to MAX_RETRIES times on network/5xx failures
- *  • In-memory LRU-like cache keyed on image fingerprint
- *  • Toast notifications for each failure mode
- *  • Fire-and-forget Supabase log save (never blocks results display)
+ * What changed from Phase 1:
+ *  - All CV Engine, YOLO, local engine logic removed
+ *  - Calls the rewritten analyze-5s edge function
+ *  - Returns AuditAnalysisResult instead of old AnalysisData
+ *  - Stage-aware progress tracks the per-pillar audit steps
+ *  - Response validation checks for PillarScoreResult[] structure
  */
 
-import { useCallback, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import type { AnalysisData, AnalysisPipelineState, AnalysisStage } from "@/types/analysis";
-import type { GeoMeta } from "@/components/ImageUploader";
+import { useCallback, useRef, useState } from 'react';
+import { supabase }   from '@/integrations/supabase/client';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+import { useToast }   from '@/hooks/use-toast';
+import { useAuth }    from '@/contexts/AuthContext';
+import type {
+  AuditAnalysisResult,
+  AnalysisPipelineState,
+  AnalysisStage,
+} from '@/types/analysis';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 1500;
-const CACHE_MAX_SIZE = 10;
-
-// ── Cache ─────────────────────────────────────────────────────────────────────
-const analysisCache = new Map<string, AnalysisData>();
-
-const fingerprintImages = (before: string, after: string): string => {
-  const getSlice = (s: string) => {
-    if (s.length <= 9000) return s;
-    const len = s.length;
-    const mid = Math.floor(len / 2);
-    const first3k = s.slice(0, 3000);
-    const mid3k = s.slice(mid - 1500, mid + 1500);
-    const last3k = s.slice(-3000);
-    return `${first3k}__${mid3k}__${last3k}`;
-  };
-  return `${getSlice(before)}[VS]${getSlice(after)}`;
-};
-
-const setCache = (key: string, data: AnalysisData) => {
-  if (analysisCache.size >= CACHE_MAX_SIZE) {
-    const firstKey = analysisCache.keys().next().value;
-    if (firstKey) analysisCache.delete(firstKey);
-  }
-  analysisCache.set(key, data);
-};
+const MAX_RETRIES   = 2;
+const RETRY_DELAY   = 1500;
 
 // ── Image utilities ───────────────────────────────────────────────────────────
 export const resizeImage = (base64: string, maxDim = 1024): Promise<string> =>
@@ -55,254 +32,240 @@ export const resizeImage = (base64: string, maxDim = 1024): Promise<string> =>
     const img = new Image();
     img.onload = () => {
       const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-      const cw = Math.round(img.naturalWidth * scale);
+      const cw = Math.round(img.naturalWidth  * scale);
       const ch = Math.round(img.naturalHeight * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = cw;
+      const canvas = document.createElement('canvas');
+      canvas.width  = cw;
       canvas.height = ch;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, cw, ch);
-      resolve(canvas.toDataURL("image/jpeg", 0.82));
+      canvas.getContext('2d')!.drawImage(img, 0, 0, cw, ch);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
     };
-    img.onerror = () => reject(new Error("Failed to load image for resizing"));
+    img.onerror = () => reject(new Error('Failed to load image for resizing'));
     img.src = base64;
   });
 
 // ── Response validator ────────────────────────────────────────────────────────
-function validateAnalysisResponse(data: unknown): data is AnalysisData {
-  if (!data || typeof data !== "object") return false;
+function validateAuditResponse(data: unknown): data is AuditAnalysisResult {
+  if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
-  const hasScores =
-    typeof d.beforeScores === "object" &&
-    typeof d.afterScores === "object" &&
-    d.beforeScores !== null &&
-    d.afterScores !== null;
-  const hasContent =
-    typeof d.overview === "string" &&
-    Array.isArray(d.recommendations) &&
-    Array.isArray(d.improvements);
-  return hasScores && hasContent;
-}
-
-// ── Retry wrapper ─────────────────────────────────────────────────────────────
-async function invokeWithRetry(
-  before: string,
-  after: string,
-  onAttempt?: (attempt: number) => void,
-  attempt = 0
-): Promise<AnalysisData> {
-  if (onAttempt && attempt > 0) {
-    onAttempt(attempt);
-  }
-
-  // --- MANUAL CV ENGINE SIMULATION ---
-  // Un-comment to test the corresponding UX scenario:
-  //
-  // Scenario A: CV Engine Offline/Killed (503)
-  // throw new Error("Deterministic CV Engine temporarily unavailable. (Simulated 503)");
-  //
-  // Scenario B: Deterministic Scoring Violation
-  // return {
-  //   overview: "Simulated violation overview",
-  //   beforeScores: { sort: 80, setInOrder: 80, shine: 80, standardize: 80, sustain: 80 },
-  //   afterScores: { sort: 90, setInOrder: 90, shine: 90, standardize: 90, sustain: 90 },
-  //   beforeExplanations: { sort: "Ok", setInOrder: "Ok", shine: "Ok", standardize: "Ok", sustain: "Ok" },
-  //   afterExplanations: { sort: "Better", setInOrder: "Better", shine: "Better", standardize: "Better", sustain: "Better" },
-  //   recommendations: [],
-  //   improvements: [],
-  //   leanMaintenanceScore: 85,
-  //   leanMaintenanceExplanation: "Simulated explanation",
-  //   scoringMethod: "gemini-fallback"
-  // };
-
-  try {
-    const { data, error } = await supabase.functions.invoke("analyze-5s", {
-      body: { beforeImage: before, afterImage: after },
-    });
-
-    if (error) {
-      const is503 = (error as { status?: number }).status === 503 || 
-                    error.message?.includes("503") || 
-                    error.message?.includes("Deterministic CV Engine temporarily unavailable");
-      if (is503) {
-        throw new Error("Deterministic CV Engine temporarily unavailable.");
-      }
-
-      if (attempt < MAX_RETRIES) {
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
-        return invokeWithRetry(before, after, onAttempt, attempt + 1);
-      }
-      throw new Error(error.message ?? "Edge function returned an error");
-    }
-
-    if (data?.error) {
-      const errorStr = String(data.error);
-      const is503 = errorStr.includes("503") || errorStr.includes("Deterministic CV Engine temporarily unavailable");
-      if (is503) {
-        throw new Error("Deterministic CV Engine temporarily unavailable.");
-      }
-      throw new Error(errorStr);
-    }
-
-    if (!validateAnalysisResponse(data)) {
-      throw new Error("The analysis service returned an unexpected response format. Please try again.");
-    }
-
-    // ── Defensive scoringMethod normalization ─────────────────────────────
-    // scoringMethod must always be the clean display value "CV Engine".
-    // rawScoringMethod intentionally contains the full CV engine telemetry
-    // string (including "Gemini" explanation-layer tag) and is NEVER checked
-    // by this guard — it is preserved for audit logs only.
-    const rawData = data as unknown as Record<string, unknown>;
-    const displayScoringMethod = (rawData.scoringMethod as string | undefined) || "";
-    if (
-      displayScoringMethod.toLowerCase().includes("fallback") ||
-      displayScoringMethod.toLowerCase().includes("gemini")
-    ) {
-      rawData.scoringMethod = "CV Engine";
-      if (!rawData.rawScoringMethod) {
-        rawData.rawScoringMethod = displayScoringMethod;
-      }
-    }
-
-    return data as AnalysisData;
-  } catch (err: unknown) {
-    const errMessage = err instanceof Error ? err.message : String(err);
-    const is503 = errMessage.includes("503") || errMessage.includes("Deterministic CV Engine temporarily unavailable");
-    const isViolation = errMessage.includes("Deterministic scoring violation detected");
-
-    if (is503 || isViolation) {
-      throw err;
-    }
-
-    if (attempt < MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
-      return invokeWithRetry(before, after, onAttempt, attempt + 1);
-    }
-    throw err;
-  }
+  return (
+    typeof d.template === 'object' &&
+    typeof d.before   === 'object' &&
+    d.before !== null &&
+    typeof (d.before as Record<string, unknown>).score === 'object' &&
+    Array.isArray(((d.before as Record<string, unknown>).score as Record<string, unknown>)?.pillar_scores)
+  );
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 export function useAnalysisPipeline(officeName: string) {
   const [pipeline, setPipeline] = useState<AnalysisPipelineState>({
-    stage: "idle",
-    progress: 0,
-    message: "",
+    stage:      'idle',
+    progress:   0,
+    message:    '',
     retryCount: 0,
   });
-  const [results, setResults] = useState<AnalysisData | null>(null);
-  const [analysisTimestamp, setAnalysisTimestamp] = useState<string | null>(null);
+  const [results, setResults]               = useState<AuditAnalysisResult | null>(null);
+  const [analysisTimestamp, setTimestamp]   = useState<string | null>(null);
   const abortRef = useRef(false);
 
-  const { toast } = useToast();
+  const { toast }    = useToast();
   const { employee } = useAuth();
 
   const setStage = useCallback(
     (stage: AnalysisStage, progress: number, message: string, retryCount = 0) => {
       setPipeline({ stage, progress, message, retryCount });
     },
-    []
+    [],
   );
 
   const runAnalysis = useCallback(
     async (
       beforeImage: string,
-      afterImage: string,
-      beforeGeo: GeoMeta | null,
-      afterGeo: GeoMeta | null
+      sessionId?: string,  // optional: persist results to existing audit session
+      templateId?: string, // optional: override default template
+      workspaceContext?: Record<string, unknown>, // optional: workspace metadata context
     ) => {
       abortRef.current = false;
       setResults(null);
 
       try {
-        // ── Stage 1: Compress ────────────────────────────────────────────
-        setStage("compressing", 10, "Compressing images…");
-        const [compBefore, compAfter] = await Promise.all([
-          resizeImage(beforeImage, 1024),
-          resizeImage(afterImage, 1024),
-        ]);
+        // Stage 1 — Compress
+        setStage('compressing', 8, 'Compressing image…');
+        const compBefore = await resizeImage(beforeImage, 1024);
         if (abortRef.current) return;
 
-        // ── Stage 2: Cache check ─────────────────────────────────────────
-        setStage("checking-cache", 20, "Checking analysis cache…");
-        const cacheKey = fingerprintImages(compBefore, compAfter);
-        const cached = analysisCache.get(cacheKey);
-        if (cached) {
-          setResults(cached);
-          setAnalysisTimestamp(new Date().toISOString());
-          setStage("complete", 100, "Results loaded from cache");
-          toast({ title: "Results ready", description: "Loaded from local cache instantly." });
-          return;
+        // Stage 2 — Load template (handled server-side, show progress)
+        setStage('loading-template', 15, 'Loading audit template…');
+        await delay(200); // brief pause for UX
+
+        // Stages 3–7 — Per-pillar AI analysis (shown via polling-style stages)
+        const pillarStages: AnalysisStage[] = [
+          'analyzing-sort',
+          'analyzing-set-in-order',
+          'analyzing-shine',
+          'analyzing-standardize',
+          'analyzing-sustain',
+        ];
+        const pillarLabels = ['Sort', 'Set in Order', 'Shine', 'Standardize', 'Sustain'];
+
+        // Start the actual edge function call in the background
+        // then advance the stage display every ~3s to show progress
+        let stageIdx = 0;
+        const stageInterval = setInterval(() => {
+          if (stageIdx < pillarStages.length) {
+            const pct = 20 + stageIdx * 10;
+            setStage(
+              pillarStages[stageIdx],
+              pct,
+              `Auditing ${pillarLabels[stageIdx]} (${stageIdx + 1}/5)…`,
+            );
+            stageIdx++;
+          }
+        }, 3000);
+
+        let data: AuditAnalysisResult;
+        try {
+          data = await invokeWithRetry(compBefore, sessionId, templateId, workspaceContext);
+        } finally {
+          clearInterval(stageInterval);
         }
 
-        // ── Stage 3: Analyze ─────────────────────────────────────────────
-        setStage("analyzing", 40, "Running 5S analysis…");
-        const data = await invokeWithRetry(compBefore, compAfter, (attempt) => {
-          setStage("analyzing", 40 + attempt * 10, `Retrying analysis (attempt ${attempt + 1})…`, attempt);
-        });
-
         if (abortRef.current) return;
 
-        setCache(cacheKey, data);
-        setResults(data);
-        const ts = new Date().toISOString();
-        setAnalysisTimestamp(ts);
+        // Stage — Scoring
+        setStage('scoring', 85, 'Calculating deterministic scores…');
+        await delay(200);
 
-        // ── Stage 4: Save log (fire-and-forget) ──────────────────────────
-        setStage("saving", 85, "Saving audit record…");
+        // Stage — Recommendations
+        setStage('recommendations', 92, 'Generating improvement recommendations…');
+        await delay(200);
+
+        // Stage — Save log
+        setStage('saving', 97, 'Saving audit record…');
         if (employee) {
           supabase.functions
-            .invoke("save-analysis-log", {
+            .invoke('save-analysis-log', {
               body: {
-                employeeId: employee.employeeId,
-                employeeName: employee.name,
-                department: employee.department,
+                employeeId:     employee.employeeId,
+                employeeName:   employee.name,
+                department:     employee.department,
                 officeName,
                 beforeImage,
-                afterImage,
                 analysisResult: data,
-                scoringMethod: data.rawScoringMethod ?? data.scoringMethod ?? "CV Engine",
-                cvMetrics:
-                  data.beforeMetrics && data.afterMetrics
-                    ? { before: data.beforeMetrics, after: data.afterMetrics }
-                    : null,
-                beforeGeo: beforeGeo ?? null,
-                afterGeo: afterGeo ?? null,
-                capturedAt: ts,
+                scoringMethod:  'AI Audit (Structured Questionnaire)',
+                capturedAt:     new Date().toISOString(),
               },
             })
             .then(({ error: logErr }) => {
-              if (logErr) console.error("Audit log save failed:", logErr);
+              if (logErr) console.error('[useAnalysisPipeline] Log save failed:', logErr);
             })
-            .catch((logErr) => console.error("Audit log save failed:", logErr));
+            .catch((e) => console.error('[useAnalysisPipeline] Log save error:', e));
         }
 
-        setStage("complete", 100, "Analysis complete");
+        setResults(data);
+        setTimestamp(new Date().toISOString());
+        setStage('complete', 100, 'Analysis complete');
+
         toast({
-          title: "Analysis Complete",
-          description: `Scored using: ${data.scoringMethod ?? "CV Engine"}`,
+          title:       'Analysis Complete',
+          description: `${data.before.score.grade} — ${data.before.score.overall_percentage.toFixed(1)}% overall score`,
         });
       } catch (err: unknown) {
         if (abortRef.current) return;
-        const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
-        console.error("Analysis pipeline error:", err);
-        setStage("error", 0, message);
+        const errObj = err as Record<string, unknown>;
+        const validationErrors = errObj.validationErrors;
+        const message = validationErrors && Array.isArray(validationErrors)
+          ? `Quality Check Failed:\n• ${validationErrors.join('\n• ')}`
+          : (err as Error).message || 'Something went wrong.';
+        console.error('[useAnalysisPipeline] Error:', err);
+        setStage('error', 0, message);
         toast({
-          title: "Analysis Failed",
-          description: message,
-          variant: "destructive",
+          title:       'Analysis Failed',
+          description: validationErrors ? 'Image quality is insufficient for auditing.' : message,
+          variant:     'destructive',
         });
       }
     },
-    [employee, officeName, setStage, toast]
+    [employee, officeName, setStage, toast],
   );
 
   const reset = useCallback(() => {
     abortRef.current = true;
     setResults(null);
-    setAnalysisTimestamp(null);
-    setPipeline({ stage: "idle", progress: 0, message: "", retryCount: 0 });
+    setTimestamp(null);
+    setPipeline({ stage: 'idle', progress: 0, message: '', retryCount: 0 });
   }, []);
 
   return { pipeline, results, analysisTimestamp, runAnalysis, reset };
 }
+
+// ── Retry wrapper ─────────────────────────────────────────────────────────────
+
+async function invokeWithRetry(
+  beforeImage: string,
+  sessionId?:  string,
+  templateId?: string,
+  workspaceContext?: Record<string, unknown>,
+  attempt = 0,
+): Promise<AuditAnalysisResult> {
+  try {
+    const { data, error } = await supabase.functions.invoke('analyze-5s', {
+      body: {
+        beforeImage,
+        sessionId:        sessionId  ?? undefined,
+        templateId:       templateId ?? undefined,
+        workspaceContext: workspaceContext ?? undefined,
+        skipImageGen:     true,
+      },
+    });
+
+    if (error) {
+      if (attempt < MAX_RETRIES) {
+        await delay(RETRY_DELAY * (attempt + 1));
+        return invokeWithRetry(beforeImage, sessionId, templateId, workspaceContext, attempt + 1);
+      }
+      
+      let errorMsg = error.message ?? 'Edge function returned an error';
+      if (error instanceof FunctionsHttpError) {
+        try {
+          const body = await error.context.json();
+          if (body && body.error) {
+            errorMsg = body.error;
+          }
+        } catch (_) {
+          // fallback
+        }
+      }
+      throw new Error(errorMsg);
+    }
+
+    if (data?.error) {
+      if (data.validationErrors) {
+        const customErr = new Error(data.error) as Error & { validationErrors?: string[] };
+        customErr.validationErrors = data.validationErrors;
+        throw customErr;
+      }
+      throw new Error(String(data.error));
+    }
+
+    if (!validateAuditResponse(data)) {
+      throw new Error(
+        'The analysis service returned an unexpected response format. Please try again.',
+      );
+    }
+
+    return data as AuditAnalysisResult;
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'validationErrors' in err) {
+      throw err;
+    }
+    if (attempt < MAX_RETRIES) {
+      await delay(RETRY_DELAY * (attempt + 1));
+      return invokeWithRetry(beforeImage, sessionId, templateId, workspaceContext, attempt + 1);
+    }
+    throw err;
+  }
+}
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));

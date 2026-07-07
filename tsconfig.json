@@ -24,6 +24,7 @@
       "vitest/globals"
     ],
     "noUnusedLocals": false,
-    "strictNullChecks": false
+    "strictNullChecks": false,
+    "allowImportingTsExtensions": true
   }
 }

@@ -3,40 +3,18 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ImageUploader, { GeoMeta } from "@/components/ImageUploader";
 import AnalysisResults from "@/components/AnalysisResults";
-import AnalysisProgress from "@/components/AnalysisProgress";
-import { Loader2, Sparkles, User, BadgeCheck, Building2, MapPin, AlertTriangle, RotateCcw } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import WorkspaceContextCard, { WorkspaceContext } from "@/modules/audit/components/WorkspaceContextCard";
+import ImageValidationPanel from "@/modules/audit/components/ImageValidationPanel";
+import AuditExecutionPanel from "@/modules/audit/components/AuditExecutionPanel";
+import AuditProgressStepper from "@/modules/audit/components/AuditProgressStepper";
+import { AuditSessionState, SESSION_STATE_TO_STEP } from "@/modules/audit/types/sessionState";
+import { Loader2, Sparkles, User, BadgeCheck, Building2, AlertTriangle, RotateCcw, Camera } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAnalysisPipeline } from "@/hooks/useAnalysisPipeline";
 import arcolabLogoSrc from "@/assets/arcolab-logo.png";
-
-// Resize and compress image to a max dimension to speed up AI analysis
-const resizeImage = (base64: string, maxDim = 1024): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
-      const scale = Math.min(1, maxDim / Math.max(w, h));
-      const cw = Math.round(w * scale);
-      const ch = Math.round(h * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = cw;
-      canvas.height = ch;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, cw, ch);
-      resolve(canvas.toDataURL("image/jpeg", 0.82));
-    };
-    img.src = base64;
-  });
-};
+import type { ImageValidationResult, AuditTimeline } from "@/types/analysis";
 
 // Loads Arcolab logo as an Image element (cached after first load)
 let cachedLogo: HTMLImageElement | null = null;
@@ -131,23 +109,34 @@ const applyWatermark = (raw: string, employeeName: string, employeeId: string, o
   });
 };
 
-
-
 const Analysis = () => {
-  const [beforeImage, setBeforeImage] = useState<string | null>(null);
-  const [afterImage, setAfterImage] = useState<string | null>(null);
-  const [rawBefore, setRawBefore] = useState<string | null>(null);
-  const [rawAfter, setRawAfter] = useState<string | null>(null);
-  const [beforeGeo, setBeforeGeo] = useState<GeoMeta | null>(null);
-  const [afterGeo, setAfterGeo] = useState<GeoMeta | null>(null);
-  const [beforeUploadTime, setBeforeUploadTime] = useState<string | null>(null);
-  const [afterUploadTime, setAfterUploadTime] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<AuditSessionState>('SESSION_SETUP');
+  
+  // Workspace Context
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [workspaceType, setWorkspaceType] = useState<string>('General');
+  const [industry, setIndustry] = useState<string>('');
+
+  // Image State
+  const [workplaceImage, setWorkplaceImage] = useState<string | null>(null);
+  const [rawImage, setRawImage] = useState<string | null>(null);
+  const [imageGeo, setImageGeo] = useState<GeoMeta | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+
+  // Validation Panel Result
+  const [validationResult, setValidationResult] = useState<ImageValidationResult | null>(null);
+
+  // Timestamps / Audit Timeline
+  const [timeline, setTimeline] = useState<AuditTimeline>({
+    imageUploaded: null,
+    validationComplete: null,
+    auditStarted: null,
+    auditCompleted: null,
+    reportGenerated: null,
+  });
+
   const { toast } = useToast();
   const { employee, office } = useAuth();
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-
-  const ZONES = ["Production", "Warehouse", "Quality Control", "Packaging", "Office Area", "Maintenance"];
 
   const officeName = office?.name ?? "Unknown Office";
   const { pipeline, results, analysisTimestamp, runAnalysis, reset } = useAnalysisPipeline(officeName);
@@ -157,82 +146,169 @@ const Analysis = () => {
     setGeoError("Location access is required for 5S audit compliance. Please enable location permissions and try again.");
   }, []);
 
-  // Dynamically apply / update watermark when raw images, zone, or auth details change
+  // Pre-fill industry from employee profile department when component mounts or employee loads
   useEffect(() => {
-    if (rawBefore) {
-      applyWatermark(rawBefore, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone)
-        .then(setBeforeImage);
-    } else {
-      setBeforeImage(null);
+    if (employee?.department && !industry) {
+      setIndustry(employee.department);
     }
-  }, [rawBefore, selectedZone, employee, officeName]);
+  }, [employee, industry]);
 
+  // Dynamically apply watermark to raw image when context details change
   useEffect(() => {
-    if (rawAfter) {
-      applyWatermark(rawAfter, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone)
-        .then(setAfterImage);
+    if (rawImage) {
+      applyWatermark(rawImage, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone)
+        .then(setWorkplaceImage);
     } else {
-      setAfterImage(null);
+      setWorkplaceImage(null);
     }
-  }, [rawAfter, selectedZone, employee, officeName]);
+  }, [rawImage, selectedZone, employee, officeName]);
 
-  const handleBeforeImage = useCallback((img: string | null, geo?: GeoMeta | null) => {
-    if (!img) {
-      setRawBefore(null);
-      setBeforeUploadTime(null);
-      setBeforeGeo(null);
-      return;
-    }
-    // Check mandatory geotag for camera images (legacy sentinel)
-    if (img.startsWith("__geo_denied__")) {
-      setGeoError("Location access required for analysis. Please enable location and try again.");
-      return;
-    }
-    setGeoError(null);
-    setBeforeUploadTime(geo?.capturedAt ?? new Date().toISOString());
-    if (geo) setBeforeGeo(geo);
-    setRawBefore(img);
+  const handleContextChange = useCallback((ctx: WorkspaceContext) => {
+    setSelectedZone(ctx.selectedZone);
+    setWorkspaceType(ctx.workspaceType);
+    setIndustry(ctx.industry);
+    setSessionState(prev => (prev === 'SESSION_SETUP' ? 'CONTEXT_READY' : prev));
   }, []);
 
-  const handleAfterImage = useCallback((img: string | null, geo?: GeoMeta | null) => {
+  const handleWorkplaceImage = useCallback((img: string | null, geo?: GeoMeta | null) => {
     if (!img) {
-      setRawAfter(null);
-      setAfterUploadTime(null);
-      setAfterGeo(null);
+      setRawImage(null);
+      setWorkplaceImage(null);
+      setImageGeo(null);
+      setValidationResult(null);
+      setTimeline({
+        imageUploaded: null,
+        validationComplete: null,
+        auditStarted: null,
+        auditCompleted: null,
+        reportGenerated: null,
+      });
+      setSessionState('CONTEXT_READY');
       return;
     }
+
     if (img.startsWith("__geo_denied__")) {
-      setGeoError("Location access required for analysis. Please enable location and try again.");
+      setGeoError("Location access required for audit. Please enable location and try again.");
       return;
     }
+
     setGeoError(null);
-    setAfterUploadTime(geo?.capturedAt ?? new Date().toISOString());
-    if (geo) setAfterGeo(geo);
-    setRawAfter(img);
+    setImageGeo(geo ?? null);
+    setRawImage(img);
+    setTimeline(prev => ({
+      ...prev,
+      imageUploaded: geo?.capturedAt ?? new Date().toISOString(),
+    }));
+    setSessionState('IMAGE_READY');
   }, []);
 
-  const handleRunAnalysis = async () => {
-    if (!beforeImage || !afterImage) {
-      toast({ title: "Please upload both images", description: "Upload a before and after image to run the analysis.", variant: "destructive" });
+  const handleValidation = useCallback((res: ImageValidationResult) => {
+    setValidationResult(res);
+    if (res.passed) {
+      setTimeline(prev => ({
+        ...prev,
+        validationComplete: new Date().toISOString(),
+      }));
+      setSessionState('IMAGE_VALIDATED');
+    } else {
+      setSessionState('IMAGE_READY');
+    }
+  }, []);
+
+  const handleStartAudit = async () => {
+    if (!workplaceImage || !selectedZone) {
+      toast({
+        title: "Missing Audit Context",
+        description: "Please specify workplace details and upload a valid image.",
+        variant: "destructive"
+      });
       return;
     }
-    await runAnalysis(beforeImage, afterImage, beforeGeo, afterGeo);
+
+    const now = new Date().toISOString();
+    setTimeline(prev => ({
+      ...prev,
+      auditStarted: now,
+    }));
+    setSessionState('AUDIT_RUNNING');
+
+    try {
+      await runAnalysis(workplaceImage, undefined, undefined, {
+        selectedZone,
+        workspaceType,
+        industry,
+        department: employee?.department,
+        area_name: selectedZone,
+      });
+    } catch (err) {
+      console.error("Audit start failed", err);
+    }
   };
 
-  // Disable Run button if location has been denied and there are no images already attached
-  const isGeoDenied = !!geoError && !beforeImage && !afterImage;
+  // Sync completion stage and results mapping with state machine
+  useEffect(() => {
+    if (pipeline.stage === 'complete' && results && sessionState === 'AUDIT_RUNNING') {
+      const now = new Date().toISOString();
+      setTimeline(prev => ({
+        ...prev,
+        auditCompleted: now,
+        reportGenerated: now,
+      }));
+      setSessionState('AUDIT_COMPLETE');
+    }
+  }, [pipeline.stage, results, sessionState]);
+
+  const handleNewAudit = () => {
+    reset();
+    setRawImage(null);
+    setWorkplaceImage(null);
+    setImageGeo(null);
+    setValidationResult(null);
+    setTimeline({
+      imageUploaded: null,
+      validationComplete: null,
+      auditStarted: null,
+      auditCompleted: null,
+      reportGenerated: null,
+    });
+    setSessionState('CONTEXT_READY');
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 section-padding bg-background">
+      <main className="flex-1 section-padding bg-background py-8">
         <div className="container-max">
-          <div className="max-w-4xl mx-auto">
-            {/* Employee + Office Card */}
+          <div className="max-w-4xl mx-auto space-y-8">
+            {/* Header Title */}
+            <div className="text-center">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground mb-2">
+                5S Workplace Audit
+              </h1>
+              <p className="text-muted-foreground max-w-xl mx-auto text-sm">
+                Perform a structured visual 5S compliance audit of the current workspace condition.
+              </p>
+            </div>
+
+            {/* Step Stepper */}
+            <AuditProgressStepper currentStep={SESSION_STATE_TO_STEP[sessionState]} />
+
+            {/* Geo error banner */}
+            {geoError && (
+              <div className="flex items-start gap-3 bg-destructive/10 border border-destructive/30 rounded-xl p-4">
+                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-destructive">Location Access Required</p>
+                  <p className="text-xs text-destructive/80 mt-0.5">{geoError}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 1: Session Information */}
             {employee && (
-              <div className="bg-card rounded-xl border border-border p-5 mb-8">
+              <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                 <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-semibold">Session Info</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <User className="h-5 w-5 text-primary" />
@@ -255,161 +331,104 @@ const Analysis = () => {
                         <Building2 className="h-5 w-5 text-primary" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Selected Office</p>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide font-bold">Selected Office</p>
                         <p className="text-sm font-semibold text-foreground leading-snug">{office.name}</p>
                       </div>
                     </div>
                   )}
-                  
-                  <div className="flex items-start gap-3 sm:border-l sm:border-border sm:pl-4">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="flex items-start gap-3 text-left w-full hover:opacity-80 outline-none transition-opacity">
-                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <MapPin className="h-5 w-5 text-primary" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Select Zone</p>
-                            <p className="text-sm font-semibold text-foreground leading-snug">
-                              {selectedZone || "Choose a zone..."}
-                            </p>
-                          </div>
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-[200px]">
-                        {ZONES.map((zone) => (
-                          <DropdownMenuItem key={zone} onClick={() => setSelectedZone(zone)}>
-                            {zone}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
                 </div>
               </div>
             )}
 
-            <div className="text-center mb-10">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground mb-3">
-                5S Workplace Analysis
-              </h1>
-              <p className="text-muted-foreground max-w-xl mx-auto">
-                Upload before and after images of your workspace. Location is required for geotagging
-                and audit compliance.
-              </p>
-            </div>
+            {/* Step 2: Workspace Context Selection */}
+            {employee && (
+              <WorkspaceContextCard
+                defaultIndustry={employee.department || ''}
+                onContextChange={handleContextChange}
+              />
+            )}
 
-            {/* Geo error banner */}
-            {geoError && (
-              <div className="flex items-start gap-3 bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-6">
-                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-destructive">Location Access Required</p>
-                  <p className="text-xs text-destructive/80 mt-0.5">{geoError}</p>
+            {/* Step 3: Upload Current Workplace Image */}
+            {sessionState !== 'SESSION_SETUP' && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <h3 className="text-sm font-black text-foreground flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-primary" />
+                    Upload Current Workplace Image
+                  </h3>
                 </div>
+                <ImageUploader
+                  label="Workplace Image"
+                  sublabel="Geotagged image of the active workstation"
+                  variant="workplace"
+                  image={workplaceImage}
+                  onImageChange={handleWorkplaceImage}
+                  employeeName={employee?.name ?? "Employee"}
+                  officeName={officeName}
+                  zoneName={selectedZone || "Unspecified Zone"}
+                  onGeoDenied={handleGeoDenied}
+                />
               </div>
             )}
 
-            {/* Geotag info banner */}
-            <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-4 py-2.5 mb-6">
-              <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">GPS geotagging is active.</span> Location, name, office, date and time will be stamped on each image.
-              </p>
-            </div>
-
-            {/* Upload section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-              <ImageUploader
-                label="Before"
-                sublabel="Before Image"
-                variant="before"
-                image={beforeImage}
-                onImageChange={handleBeforeImage}
-                timestamp={beforeUploadTime}
-                employeeName={employee?.name ?? "Employee"}
-                officeName={officeName}
-                zoneName={selectedZone || "Unspecified Zone"}
-                onGeoDenied={handleGeoDenied}
+            {/* Step 4: Image Quality Validation */}
+            {workplaceImage && (sessionState === 'IMAGE_READY' || sessionState === 'IMAGE_VALIDATED') && (
+              <ImageValidationPanel
+                imageBase64={workplaceImage}
+                onValidation={handleValidation}
               />
-              <ImageUploader
-                label="After"
-                sublabel="After Image"
-                variant="after"
-                image={afterImage}
-                onImageChange={handleAfterImage}
-                timestamp={afterUploadTime}
-                employeeName={employee?.name ?? "Employee"}
-                officeName={officeName}
-                zoneName={selectedZone || "Unspecified Zone"}
-                onGeoDenied={handleGeoDenied}
-              />
-            </div>
-
-            {/* Progress indicator */}
-            <AnalysisProgress pipeline={pipeline} />
-
-            {/* Error UI Alert Card */}
-            {pipeline.stage === "error" && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 text-center mb-8 shadow-sm animate-fade-in">
-                <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-foreground mb-2">Analysis Failed</h3>
-                <p className="text-sm font-medium text-destructive max-w-md mx-auto mb-6">
-                  {pipeline.message}
-                </p>
-                <button
-                  onClick={handleRunAnalysis}
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-destructive px-5 py-2.5 text-sm font-semibold text-white hover:bg-destructive/90 transition-colors shadow-sm"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Retry Analysis
-                </button>
-              </div>
             )}
 
-            {/* Run / Reset button row */}
-            <div className="flex gap-3 mb-10">
-              <button
-                onClick={handleRunAnalysis}
-                disabled={loading || !beforeImage || !afterImage || isGeoDenied}
-                className="flex-1 flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3.5 text-base font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    {pipeline.message || "Analyzing workspace…"}
-                  </>
+            {/* Step 5: Action Button (Start / Reset) */}
+            {sessionState !== 'SESSION_SETUP' && (
+              <div className="flex gap-3">
+                {sessionState !== 'AUDIT_COMPLETE' ? (
+                  <button
+                    onClick={handleStartAudit}
+                    disabled={sessionState !== 'IMAGE_VALIDATED' || loading}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        {pipeline.message || "Auditing workspace…"}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5" />
+                        Start 5S Audit
+                      </>
+                    )}
+                  </button>
                 ) : (
-                  <>
-                    <Sparkles className="h-5 w-5" />
-                    Run 5S Analysis
-                  </>
+                  <button
+                    onClick={handleNewAudit}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border px-6 py-4 text-base font-bold text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <RotateCcw className="h-5 w-5" />
+                    New Audit
+                  </button>
                 )}
-              </button>
-              {results && (
-                <button
-                  onClick={() => {
-                    reset();
-                  }}
-                  title="Clear results and start over"
-                  className="flex items-center justify-center gap-2 rounded-md border border-border px-4 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reset
-                </button>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Results */}
-            {results && beforeImage && afterImage && (
-              <AnalysisResults
-                data={results}
-                beforeImage={beforeImage}
-                afterImage={afterImage}
-                analysisTimestamp={analysisTimestamp || undefined}
-                beforeUploadTime={beforeUploadTime || undefined}
-                afterUploadTime={afterUploadTime || undefined}
-              />
+            {/* Progress Panel */}
+            {sessionState === 'AUDIT_RUNNING' && (
+              <AuditExecutionPanel pipeline={pipeline} results={results} />
+            )}
+
+            {/* Step 6 & 7: Audit Report & Results */}
+            {results && workplaceImage && (sessionState === 'AUDIT_COMPLETE' || sessionState === 'REPORT_READY') && (
+              <div className="animate-fade-in pt-4">
+                <AnalysisResults
+                  data={results}
+                  workplaceImage={workplaceImage}
+                  analysisTimestamp={analysisTimestamp || undefined}
+                  imageQualityScore={validationResult?.qualityScore}
+                  imageQualityLevel={validationResult?.qualityLevel}
+                  timeline={timeline}
+                />
+              </div>
             )}
           </div>
         </div>
