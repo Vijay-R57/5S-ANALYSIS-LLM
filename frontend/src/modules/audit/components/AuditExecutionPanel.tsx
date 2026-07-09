@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Circle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { AnalysisPipelineState, AuditAnalysisResult } from '@/types/analysis';
 import { AUDIT_PILLARS, PILLAR_META } from '../constants/pillars';
-import { STANDARD_5S_QUESTIONS } from '../utils/auditMapper';
+import { getAllQuestions } from '../pipeline/questions';
 
 type QuestionStatus = 'pending' | 'running' | 'completed';
 
@@ -51,7 +51,7 @@ function initialPillarProgress(): PillarProgress[] {
   return AUDIT_PILLARS.map((p) => ({
     pillar:    p,
     status:    'pending',
-    questions: (STANDARD_5S_QUESTIONS[p] ?? []).map((q) => ({
+    questions: getAllQuestions().filter((q) => q.pillar === p).map((q) => ({
       id:     q.id,
       text:   q.question,
       status: 'pending',

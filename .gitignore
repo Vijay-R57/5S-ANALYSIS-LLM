@@ -37,3 +37,7 @@ cv-engine/venv/
 cv-engine/.venv/
 cv-engine/runs/        
 cv-engine/*.pt
+
+# Executables
+*.exe
+
