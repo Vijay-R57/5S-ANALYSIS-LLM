@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function main() {
-  const migrationsDir = path.join(__dirname, 'supabase', 'migrations');
+  const migrationsDir = path.join(__dirname, '..', 'migrations');
   const files = fs.readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
     .sort();
@@ -143,7 +143,7 @@ BEGIN
 END $$;
 `;
 
-  fs.writeFileSync(path.join(__dirname, 'setup-database.sql'), combinedSql, 'utf8');
+  fs.writeFileSync(path.join(__dirname, '..', 'setup-database.sql'), combinedSql, 'utf8');
   console.log('✅ Generated setup-database.sql successfully!');
 }
 
