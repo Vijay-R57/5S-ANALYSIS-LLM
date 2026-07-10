@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,11 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
     const { employeeId, password } = await req.json();
 
     if (!employeeId || !password) {
@@ -21,32 +27,53 @@ serve(async (req) => {
     }
 
     const empCode = employeeId.trim().toUpperCase();
+    const email = `${empCode.toLowerCase()}@arcolab.com`;
 
-    // Mock response for login
+    // Sign in using Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError || !authData.session) {
+      return new Response(
+        JSON.stringify({ error: authError?.message || "Invalid credentials" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch user profile from public.profiles
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", authData.session.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return new Response(
+        JSON.stringify({ error: "Employee profile not found in database" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
-        session: {
-          access_token: "mock-access-token",
-          refresh_token: "mock-refresh-token",
-          user: {
-            id: "mock-user-id",
-            email: `${empCode.toLowerCase()}@arcolab.com`,
-          }
-        },
+        session: authData.session,
         employee: {
-          employeeId: empCode,
-          name: "Mock Employee",
+          employeeId: profile.employee_code,
+          name: `${profile.first_name} ${profile.last_name}`.trim(),
           department: "Operational Excellence",
-          office_id: "office-1",
-          role: "admin",
+          office_id: profile.office_id,
+          role: profile.role,
         }
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : "An unexpected server error occurred";
     return new Response(
-      JSON.stringify({ error: "An unexpected server error occurred" }),
+      JSON.stringify({ error: errMsg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

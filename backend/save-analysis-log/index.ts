@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,15 +12,42 @@ serve(async (req) => {
   }
 
   try {
-    // Simply accept the payload and return a mock response
-    const payload = await req.json();
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { employeeId, employeeName, department, officeName, beforeImage, analysisResult, scoringMethod } = await req.json();
+
+    const { data, error } = await supabase
+      .from("analysis_logs")
+      .insert({
+        employee_id: employeeId,
+        employee_name: employeeName,
+        department: department,
+        office_name: officeName,
+        before_image: beforeImage,
+        analysis_result: analysisResult,
+        scoring_method: scoringMethod || "AI Audit V2 (Rating-Based)",
+        upload_status: "uploaded"
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Database save failed:", error);
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        beforeImagePath: "mock/path/before.jpg",
-        afterImagePath: null,
-        uploadStatus: "uploaded",
+        logId: data.id,
+        beforeImagePath: data.before_image_path,
+        uploadStatus: data.upload_status
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
