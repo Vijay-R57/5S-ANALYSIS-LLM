@@ -556,6 +556,45 @@ export interface QuestionScore {
   evaluationTrace: string[];
 }
 
+// ── Score Aggregator Engine (Pipeline V3 — Phase 6.5) ────────────────────────
+//
+// Output of scoreAggregation/index.ts.
+// Aggregates QuestionScore[] into PillarScore[] and one OverallScore.
+
+/** Aggregated scoring result for a single 5S pillar. */
+export interface PillarScore {
+  /** The 5S pillar name, e.g. "SORT". */
+  pillar:            string;
+  /** Total questions configured for this pillar. */
+  questionCount:     number;
+  /** Count of questions that were evaluated (scoreEligible = true). */
+  eligibleQuestions: number;
+  /** Count of questions that were not evaluated (scoreEligible = false). */
+  skippedQuestions:  number;
+  /** Combined actual score of all eligible questions. */
+  actualScore:       number;
+  /** Combined maximum possible score of all eligible questions. */
+  maximumScore:      number;
+  /** Percentage score for this pillar (rounded consistently, e.g. 83.33). */
+  percentage:        number;
+}
+
+/** Complete overall scoring result for the audit. */
+export interface OverallScore {
+  /** Combined actual score of all evaluated questions across all pillars. */
+  actualScore:        number;
+  /** Combined maximum score of all evaluated questions across all pillars. */
+  maximumScore:       number;
+  /** Overall percentage score (rounded consistently, e.g. 78.95). */
+  percentage:         number;
+  /** Total count of evaluated (scoreEligible = true) questions. */
+  evaluatedQuestions: number;
+  /** Total count of skipped (scoreEligible = false) questions. */
+  skippedQuestions:   number;
+  /** Total count of evaluated pillars (pillars containing at least one question). */
+  evaluatedPillars:   number;
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'
