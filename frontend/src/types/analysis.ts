@@ -525,6 +525,37 @@ export interface RuleEvaluationResult {
   evaluationTrace:   string[];
 }
 
+// ── Question Score Calculator (Pipeline V3 — Phase 6.4) ──────────────────────
+//
+// Output of questionScore/index.ts.
+// One QuestionScore is produced for every audit question.
+// Consumed by the Pillar Score Calculator (Sprint 6.5).
+
+/**
+ * Numeric scoring result for a single question.
+ *
+ * Immutably wraps the rule engine output and adds:
+ *   - score: number | null (null if NOT_SCORED)
+ *   - maxScore: number | null (null if NOT_SCORED)
+ *   - scoreEligible: boolean
+ */
+export interface QuestionScore {
+  /** Audit question ID, e.g. "SORT_Q1". */
+  questionId:      string;
+  /** Visibility status: 'VISIBLE' | 'PARTIALLY_VISIBLE' | 'NOT_VISIBLE' */
+  visibility:      string;
+  /** Rating resolved from rule engine: 'VERY_GOOD' | 'GOOD' | 'AVERAGE' | 'BAD' | 'VERY_BAD' | 'NOT_SCORED' */
+  rating:          AuditRating;
+  /** Factual numeric score (0-4), or null if rating is 'NOT_SCORED'. */
+  score:           number | null;
+  /** Maximum score possible for this question (usually 4), or null if rating is 'NOT_SCORED'. */
+  maxScore:        number | null;
+  /** true if rating !== 'NOT_SCORED' (question has visible evidence and is scored). */
+  scoreEligible:   boolean;
+  /** Step-by-step trace of execution. */
+  evaluationTrace: string[];
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'
