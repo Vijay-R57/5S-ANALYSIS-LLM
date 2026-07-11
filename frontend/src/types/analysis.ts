@@ -595,6 +595,80 @@ export interface OverallScore {
   evaluatedPillars:   number;
 }
 
+// ── Grade Engine & Audit Debug Trace (Pipeline V3 — Phase 6.6) ───────────────
+//
+// Outputs of grade/index.ts and trace/index.ts.
+
+/** Result of Grade Engine evaluation. */
+export interface GradeResult {
+  /** Overall audit score percentage. */
+  overallPercentage: number;
+  /** Factual assigned grade, e.g. "A", "B", "F". */
+  grade:             string;
+  /** Configured boundary string matching the score, e.g. "80-89". */
+  matchedThreshold:  string;
+  /** Grading configuration version. */
+  gradingVersion:    string;
+}
+
+/** Factual trace details recorded for a single stage in the pipeline. */
+export interface PipelineStageTrace {
+  /** The stage identifier, e.g. "Visibility Engine". */
+  stage:            string;
+  /** ISO timestamp when the stage began. */
+  startTime:        string;
+  /** ISO timestamp when the stage completed. */
+  endTime:          string;
+  /** Execution duration in milliseconds. */
+  duration:         number;
+  /** Execution status. */
+  status:           'PASS' | 'FAIL';
+  /** Factual summary of inputs received by this stage. */
+  inputSummary?:    any;
+  /** Factual summary of outputs produced by this stage. */
+  outputSummary?:   any;
+  /** Warnings emitted during execution. */
+  warnings:         string[];
+  /** Errors encountered during execution. */
+  errors:           string[];
+  /** Decision made for the pipeline flow, e.g. "PASS_TO_RULE_ENGINE". */
+  pipelineDecision: string;
+}
+
+/** Factual audit lineage recorded for a single question. */
+export interface QuestionExecutionTrace {
+  /** The unique question identifier, e.g. "SORT_Q1". */
+  questionId:     string;
+  /** Visibility status: 'VISIBLE' | 'PARTIALLY_VISIBLE' | 'NOT_VISIBLE' */
+  visibility:     string;
+  /** Standardized evidence identifiers matched. */
+  evidenceIds:    string[];
+  /** Required evidence keys successfully found. */
+  matchedEvidence:string[];
+  /** Rating assigned: 'VERY_GOOD' | 'GOOD' | etc. */
+  rating:         string;
+  /** Score assigned, or null if NOT_SCORED. */
+  score:          number | null;
+  /** Execution duration for this question's evaluation in milliseconds. */
+  processingTime: number;
+}
+
+/** Complete execution lineage and trace recorded for one audit run. */
+export interface AuditDebugTrace {
+  /** Unique audit identifier. */
+  auditId:              string;
+  /** Version of the AI Pipeline, e.g. "V3". */
+  pipelineVersion:      string;
+  /** Version of the questions configuration, e.g. "1.0". */
+  configurationVersion: string;
+  /** Name of the active audit template, e.g. "Industrial_5S". */
+  auditTemplate:        string;
+  /** Factual traces of each pipeline stage. */
+  stages:               PipelineStageTrace[];
+  /** Execution traces for each individual question. */
+  questions:            QuestionExecutionTrace[];
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'
