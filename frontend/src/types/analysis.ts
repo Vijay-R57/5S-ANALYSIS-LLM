@@ -186,6 +186,75 @@ export interface ImageValidationV3Result {
   errors:       string[];
 }
 
+// ── Gemini Vision Analyzer (Pipeline V3 — Phase 2) ───────────────────────────
+//
+// Output of geminiVisionAnalyzer.ts.
+// Represents pure visual perception — no audit, no scoring, no recommendations.
+// Consumed by the Structured Observation Engine (Sprint 3).
+
+/** The scene / environment type detected in the image. */
+export interface GeminiVisionScene {
+  /**
+   * Human-readable environment description.
+   * Examples: "Industrial Chemical Storage Area", "Manufacturing Workshop Floor"
+   * Gemini infers this from visible context. Never hardcoded.
+   */
+  environment: string;
+  /** Gemini's confidence in the scene classification (0–100). */
+  confidence:  number;
+}
+
+/** A single visually detected object in the image. */
+export interface GeminiVisionObject {
+  /** Sequential identifier starting from 1. */
+  id:         number;
+  /** Descriptive name of the object as observed. Never evaluated for compliance. */
+  name:       string;
+  /** Estimated visual count of this object type in the image. */
+  count:      number;
+  /**
+   * Approximate location in the image frame.
+   * Examples: "Left", "Center walkway", "Background", "Upper right", "Foreground"
+   */
+  location:   string;
+  /** Gemini's confidence in this detection (0–100). */
+  confidence: number;
+}
+
+/**
+ * Full output of the Gemini Vision Analyzer.
+ *
+ * IMPORTANT: This object contains ONLY visual observations.
+ * It MUST NOT contain any of:
+ *   - Audit scores
+ *   - 5S ratings
+ *   - Compliance judgements
+ *   - Recommendations
+ *   - Rule evaluations
+ *
+ * The downstream Observation Engine (Sprint 3) consumes this object.
+ */
+export interface GeminiVisionResult {
+  /** Detected scene / environment classification. */
+  scene:       GeminiVisionScene;
+  /**
+   * All major visible workplace objects.
+   * Only objects that are visibly present — never invented.
+   */
+  objects:     GeminiVisionObject[];
+  /**
+   * All text strings readable in the image (OCR output).
+   * Raw strings only — meaning is never interpreted here.
+   * Examples: ["CHEMICAL STORAGE AREA", "LIME", "FIRE EXIT"]
+   */
+  visibleText: string[];
+  /**
+   * Present only when both Gemini attempts failed.
+   * Downstream stages must check for this field and handle gracefully.
+   */
+  _error?: string;
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'
