@@ -30,8 +30,15 @@ export function calculateAllQuestionScores(
   ruleResults: RuleEvaluationResult[],
   config:      any,
 ): QuestionScore[] {
-  return ruleResults.map(result =>
-    calculateQuestionScore(
+  const pillarMap = new Map<string, string>();
+  if (config && Array.isArray(config.allQuestions)) {
+    for (const q of config.allQuestions) {
+      pillarMap.set(q.id, q.pillar);
+    }
+  }
+
+  return ruleResults.map(result => {
+    const calculated = calculateQuestionScore(
       {
         questionId:      result.questionId,
         visibility:      result.visibility,
@@ -39,6 +46,14 @@ export function calculateAllQuestionScores(
         evaluationTrace: result.evaluationTrace,
       },
       config,
-    ),
-  );
+    );
+
+    // Fall back to prefix parsing if not listed in template configuration
+    const pillar = pillarMap.get(result.questionId) ?? result.questionId.split('_')[0];
+
+    return {
+      ...calculated,
+      pillar,
+    };
+  });
 }
