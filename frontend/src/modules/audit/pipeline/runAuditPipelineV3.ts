@@ -150,7 +150,7 @@ export async function runAuditPipelineV3(
   const questionTrace = ruleResults.flatMap(r =>
     r.evaluationTrace.map(msg => ({ questionId: r.questionId, stepName: 'Rule Match', logMessage: msg })),
   );
-  const trace = buildAuditTrace(auditId, stages, questionTrace);
+  const trace = buildAuditTrace(auditId, config, stages, questionTrace);
   const stage12Dur = timer.stop();
   stages.push(recordStageTrace('audit-trace', stage12Dur, 'success'));
 
