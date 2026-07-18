@@ -110,6 +110,7 @@ export interface AuditAnalysisResult {
   improvement_prompt: string | null;
   explainability_report?: unknown;
   scoringMethod?:     string;
+  raw_gemini_response?: any;
 }
 
 // ── Image Validation (Phase 3A) ───────────────────────────────────────────────

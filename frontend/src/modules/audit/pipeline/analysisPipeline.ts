@@ -478,6 +478,7 @@ function buildAuditAnalysisResult(
   allConfidences: Array<number | null>,
   rawRecommendations: GeminiRawRecommendation[],
   modelName:      string,
+  rawResponse:    any,
 ): AuditAnalysisResult {
   // ── Debug: Question evaluations (details per question) ───────────────────
   debugGroup('Question Evaluations');
@@ -606,6 +607,7 @@ function buildAuditAnalysisResult(
     improvement_prompt:    null,
     explainability_report: null,
     scoringMethod:         'AI Audit V2 (Rating-Based)',
+    raw_gemini_response:   rawResponse,
   };
 }
 
@@ -707,6 +709,7 @@ export async function runAuditPipeline(
     allConfidences,
     rawRecommendations,
     modelName,
+    parsed,
   );
 
   // ── Debug: Pipeline Finished ──────────────────────────────────────────────
