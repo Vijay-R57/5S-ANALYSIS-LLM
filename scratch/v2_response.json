@@ -1,0 +1,274 @@
+{
+  "template": {
+    "id": "std-5s-v2",
+    "name": "Standard 5S Audit",
+    "version": "2.0.0"
+  },
+  "prompt_version": "v2.0",
+  "vision_model": "gemini-3.5-flash",
+  "schema_version": "2.0",
+  "audit_confidence": 0.81,
+  "before": {
+    "score": {
+      "pillar_scores": [
+        {
+          "pillar": "Sort",
+          "score": 13,
+          "maximum": 16,
+          "percentage": 81,
+          "raw_percentage": 81,
+          "passed": 3,
+          "partial": 1,
+          "failed": 0,
+          "not_visible": 0,
+          "not_applicable": 0,
+          "critical": 0,
+          "cap_applied": false,
+          "top_deductions": []
+        },
+        {
+          "pillar": "Set in Order",
+          "score": 15,
+          "maximum": 16,
+          "percentage": 94,
+          "raw_percentage": 94,
+          "passed": 4,
+          "partial": 0,
+          "failed": 0,
+          "not_visible": 0,
+          "not_applicable": 0,
+          "critical": 0,
+          "cap_applied": false,
+          "top_deductions": []
+        },
+        {
+          "pillar": "Shine",
+          "score": 16,
+          "maximum": 16,
+          "percentage": 100,
+          "raw_percentage": 100,
+          "passed": 4,
+          "partial": 0,
+          "failed": 0,
+          "not_visible": 0,
+          "not_applicable": 0,
+          "critical": 0,
+          "cap_applied": false,
+          "top_deductions": []
+        },
+        {
+          "pillar": "Standardize",
+          "score": 13,
+          "maximum": 16,
+          "percentage": 81,
+          "raw_percentage": 81,
+          "passed": 3,
+          "partial": 1,
+          "failed": 0,
+          "not_visible": 0,
+          "not_applicable": 0,
+          "critical": 0,
+          "cap_applied": false,
+          "top_deductions": []
+        },
+        {
+          "pillar": "Sustain",
+          "score": 12,
+          "maximum": 16,
+          "percentage": 75,
+          "raw_percentage": 75,
+          "passed": 2,
+          "partial": 2,
+          "failed": 0,
+          "not_visible": 0,
+          "not_applicable": 0,
+          "critical": 0,
+          "cap_applied": false,
+          "top_deductions": []
+        }
+      ],
+      "overall_score": 69,
+      "overall_maximum": 80,
+      "overall_percentage": 86,
+      "grade": "Very Good",
+      "grade_color": "green",
+      "total_answered": 20,
+      "total_questions": 20,
+      "critical_failures": 0,
+      "computed_at": "2026-07-18T22:27:44.278Z"
+    },
+    "responses": [
+      {
+        "question_id": "SORT_Q1",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "Chemical containers are neatly organized and stored on designated pallets within marked boundaries. There is no visible raw material clutter or unorganized container storage blocking working space.",
+        "score": 4
+      },
+      {
+        "question_id": "SORT_Q2",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "All visible tools are neatly organized on the dedicated shadow board, and auxiliary materials are arranged on shelves inside the mobile storage cart.",
+        "score": 4
+      },
+      {
+        "question_id": "SORT_Q3",
+        "ai_answer": "YES",
+        "confidence": 0.9,
+        "evidence": "The large equipment and storage racks appear operational and well-integrated. An office chair is present in the walkway floor space, but there is no large abandoned or non-operational machinery.",
+        "score": 3
+      },
+      {
+        "question_id": "SORT_Q4",
+        "ai_answer": "PARTIAL",
+        "confidence": 0.3,
+        "evidence": "Cannot be determined from the provided image.",
+        "score": 2
+      },
+      {
+        "question_id": "SET_IN_ORDER_Q1",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "The storage zone is clearly marked with a prominent 'CHEMICAL STORAGE AREA' sign, and wall labels such as 'LIME' and 'Tools & Instruments' are highly visible.",
+        "score": 4
+      },
+      {
+        "question_id": "SET_IN_ORDER_Q2",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "A highly visible shadow board labeled 'Tools & Instruments' defines exact storage locations for maintenance/cleaning tools, and the storage cart is systematically organized with shelving.",
+        "score": 4
+      },
+      {
+        "question_id": "SET_IN_ORDER_Q3",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "Clear yellow lines define the boundaries of the chemical storage pallets, and yellow-and-black striped hazard tape marks the edges of the foreground storage platform.",
+        "score": 4
+      },
+      {
+        "question_id": "SET_IN_ORDER_Q4",
+        "ai_answer": "YES",
+        "confidence": 0.85,
+        "evidence": "Work instruction and notice boards are mounted neatly on the walls in highly visible locations, although the individual contents are too distant to read.",
+        "score": 3
+      },
+      {
+        "question_id": "SHINE_Q1",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "Cleaning tools (brooms, hand brushes, and dustpans) are clearly visible, stored on a designated wall shadow board, and easily accessible near the storage zone.",
+        "score": 4
+      },
+      {
+        "question_id": "SHINE_Q2",
+        "ai_answer": "YES",
+        "confidence": 0.9,
+        "evidence": "The stainless steel cart, plastic chemical storage containers, pallets, and background process equipment are clean and show no visible signs of dust accumulation, spills, or chemical leaks.",
+        "score": 4
+      },
+      {
+        "question_id": "SHINE_Q3",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "The concrete floors and surrounding walls are clean and entirely free from dirt, dust, spills, or loose waste materials.",
+        "score": 4
+      },
+      {
+        "question_id": "SHINE_Q4",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "The pristine state of the floors, pristine walls, organized tool shadow board, and clean chemical storage bins together indicate that housekeeping is consistently practiced.",
+        "score": 4
+      },
+      {
+        "question_id": "STANDARDIZE_Q1",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "Consistent visual standards are applied, including standardized blue/yellow floor striping, a standardized header sign for the tool board, and matching blue waste bins with standard labels.",
+        "score": 4
+      },
+      {
+        "question_id": "STANDARDIZE_Q2",
+        "ai_answer": "PARTIAL",
+        "confidence": 0.3,
+        "evidence": "Cannot be determined from the provided image.",
+        "score": 2
+      },
+      {
+        "question_id": "STANDARDIZE_Q3",
+        "ai_answer": "YES",
+        "confidence": 0.85,
+        "evidence": "Safety labels, fire extinguisher identification, and informational notice boards are clearly posted on the walls in accessible locations.",
+        "score": 3
+      },
+      {
+        "question_id": "STANDARDIZE_Q4",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "Containers are consistently grouped on color-coded spill pallets within yellow-striped boundaries, accompanied by clear signage indicating the specific chemical storage area.",
+        "score": 4
+      },
+      {
+        "question_id": "SUSTAIN_Q1",
+        "ai_answer": "PARTIAL",
+        "confidence": 0.3,
+        "evidence": "Cannot be determined from the provided image.",
+        "score": 2
+      },
+      {
+        "question_id": "SUSTAIN_Q2",
+        "ai_answer": "PARTIAL",
+        "confidence": 0.3,
+        "evidence": "Cannot be determined from the provided image.",
+        "score": 2
+      },
+      {
+        "question_id": "SUSTAIN_Q3",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "All labels, floor safety markings, and storage boundaries are sharp and intact with no signs of fading, damage, or neglect, and all tools remain in their designated shadow board slots.",
+        "score": 4
+      },
+      {
+        "question_id": "SUSTAIN_Q4",
+        "ai_answer": "YES",
+        "confidence": 0.95,
+        "evidence": "The entire storage bay displays an exceptionally high standard of cleanliness, order, and visual control, indicating a highly sustained 5S culture.",
+        "score": 4
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "pillar": "Sort",
+      "severity": "MAJOR",
+      "priority": 1,
+      "priority_label": "High Priority",
+      "title": "An office-style mesh chair is left sitting directly in the open floor area between the storage zones, creating a potential tripping hazard and obstruction.",
+      "description": "Relocate the chair to a designated office or desk area, or mark a dedicated 'parking' boundary if the chair must be kept in the room for operational needs.",
+      "problem": "An office-style mesh chair is left sitting directly in the open floor area between the storage zones, creating a potential tripping hazard and obstruction.",
+      "root_cause": "An office-style mesh chair is left sitting directly in the open floor area between the storage zones, creating a potential tripping hazard and obstruction.",
+      "corrective_action": "Relocate the chair to a designated office or desk area, or mark a dedicated 'parking' boundary if the chair must be kept in the room for operational needs.",
+      "expected_benefit": "Maintains completely clear, safe, and unobstructed walkways for personnel handling chemical containers.",
+      "linked_question_id": "SORT_Q1"
+    },
+    {
+      "pillar": "Standardize",
+      "severity": "MAJOR",
+      "priority": 2,
+      "priority_label": "High Priority",
+      "title": "Specific 5S standards, daily cleaning checklists, or shadow board return procedures are not visibly posted near the cleaning station.",
+      "description": "Mount a small, laminated 5S checklist or audit standard card adjacent to the 'Tools & Instruments' shadow board.",
+      "problem": "Specific 5S standards, daily cleaning checklists, or shadow board return procedures are not visibly posted near the cleaning station.",
+      "root_cause": "Specific 5S standards, daily cleaning checklists, or shadow board return procedures are not visibly posted near the cleaning station.",
+      "corrective_action": "Mount a small, laminated 5S checklist or audit standard card adjacent to the 'Tools & Instruments' shadow board.",
+      "expected_benefit": "Ensures that team members have instant visual reference for maintaining the high cleanliness and organizational standard of the area.",
+      "linked_question_id": "STANDARDIZE_Q1"
+    }
+  ],
+  "improvement_prompt": null,
+  "explainability_report": null,
+  "scoringMethod": "AI Audit V2 (Rating-Based)"
+}
