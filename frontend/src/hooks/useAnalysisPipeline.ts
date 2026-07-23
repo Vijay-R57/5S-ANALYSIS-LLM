@@ -300,23 +300,15 @@ async function invokeAnalysis(
   }
 
   // Direct browser Gemini API call
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.NEXT_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      'VITE_GEMINI_API_KEY is not configured. Please add it to your .env file.',
+      'VITE_GEMINI_API_KEY or GEMINI_API_KEY is not configured. Please add it to your environment variables.',
     );
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  console.log('[useAnalysisPipeline] Running direct Gemini API analysis…');
-  // runAuditPipeline handles its own single retry internally
-  return runAuditPipeline(imageBase64, apiKey, extendedContext);
-=======
-=======
->>>>>>> 22bb840 (Refine Gemini production prompt for Audit Zone Context Integration)
   console.log('[useAnalysisPipeline] Running V3 Direct AI Analysis Pipeline...');
-  const report = await runAuditPipelineV3(imageBase64, apiKey, workspaceContext);
+  const report = await runAuditPipelineV3(imageBase64, apiKey, extendedContext);
   return transformReportToV2Result(report);
 }
 
@@ -425,16 +417,8 @@ function transformReportToV2Result(report: Final5SAuditReport): AuditAnalysisRes
     explainability_report: null,
     scoringMethod:         'AI Audit V3 (Deterministic)',
   };
-<<<<<<< HEAD
->>>>>>> 859e5d8 (feat(pipeline-v3): wire complete V3 pipeline loop & integrate into frontend hook)
-=======
-=======
-  console.log('[useAnalysisPipeline] Running direct Gemini API analysis…');
-  // runAuditPipeline handles its own single retry internally
-  return runAuditPipeline(imageBase64, apiKey, extendedContext);
->>>>>>> 000b7e4 (Refine Gemini production prompt for Audit Zone Context Integration)
->>>>>>> 22bb840 (Refine Gemini production prompt for Audit Zone Context Integration)
 }
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

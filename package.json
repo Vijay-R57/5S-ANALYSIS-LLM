@@ -1,0 +1,9 @@
+{
+  "name": "arcolab-5s",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm run build --prefix frontend",
+    "install-all": "npm install --prefix frontend"
+  }
+}

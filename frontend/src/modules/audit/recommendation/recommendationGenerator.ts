@@ -99,7 +99,7 @@ export async function generateRecommendations(
   const startTime = Date.now();
 
   // Load API key
-  const apiKey = customApiKey ?? (import.meta.env?.VITE_GEMINI_API_KEY as string);
+  const apiKey = customApiKey ?? (import.meta.env?.VITE_GEMINI_API_KEY as string) ?? (import.meta.env?.GEMINI_API_KEY as string) ?? (import.meta.env?.NEXT_PUBLIC_GEMINI_API_KEY as string);
 
   if (!apiKey || apiKey.trim() === '') {
     debugError('VITE_GEMINI_API_KEY is missing. Skipping recommendations.', null);

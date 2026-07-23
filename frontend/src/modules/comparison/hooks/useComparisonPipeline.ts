@@ -65,7 +65,8 @@ async function analyzeWithGeminiDirect(
 ): Promise<AnalysisData> {
   const keys = Array.from(new Set([
     import.meta.env.VITE_GEMINI_API_KEY,
-    "AIzaSyDtC78VtCqgQk-0EauTJ7vnodStu_eh9KU",
+    import.meta.env.GEMINI_API_KEY,
+    import.meta.env.NEXT_PUBLIC_GEMINI_API_KEY,
     localStorage.getItem("arcolab_gemini_api_key")
   ].filter(Boolean))) as string[];
 
