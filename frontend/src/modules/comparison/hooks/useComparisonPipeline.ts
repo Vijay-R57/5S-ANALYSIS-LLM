@@ -330,9 +330,9 @@ export function useComparisonPipeline(officeName: string) {
         // Save locally
         saveLocalAuditLog(logPayload);
 
-        // Save to Supabase database via Edge Function or direct client
+        // Save to Supabase database via Edge Function or direct client fallback
         try {
-          await supabase.functions.invoke("save-comparison-log", {
+          const { error: fnErr } = await supabase.functions.invoke("save-comparison-log", {
             body: {
               employeeId: employee?.employeeId || "ARC100",
               employeeName: employee?.name || "Operational Auditor",
@@ -347,8 +347,23 @@ export function useComparisonPipeline(officeName: string) {
               capturedAt: ts,
             },
           });
+
+          if (fnErr) {
+            console.warn("[useComparisonPipeline] Edge function save-comparison-log failed. Inserting directly to DB...", fnErr);
+            await (supabase.from("analysis_logs" as never) as any).insert({
+              employee_id: employee?.employeeId || "ARC100",
+              employee_name: employee?.name || "Operational Auditor",
+              department: employee?.department || "Quality Assurance",
+              office_name: officeName || "Arcolab Corporate HQ",
+              before_image: compBefore,
+              after_image: compAfter,
+              analysis_result: data,
+              scoring_method: data.scoringMethod || "Gemini Vision",
+              created_at: ts,
+            });
+          }
         } catch (dbErr) {
-          console.warn("[useComparisonPipeline] Supabase Edge log saver warning:", dbErr);
+          console.warn("[useComparisonPipeline] Direct DB log saver fallback warning:", dbErr);
         }
 
         setStage("complete", 100, "Analysis complete");
