@@ -1,12 +1,12 @@
 /**
  * src/modules/audit/components/AuditSessionSummary.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Redesigned past session audit report dashboard (Phase 3A Redesign).
- * Provides the same layout, workflow, and aesthetic styling as AnalysisResults.tsx.
+ * Past session audit report dashboard.
+ * Uses the global ARCOLAB Design System for consistent layout and typography.
  */
 
 import React, { useState } from 'react';
-import { Download, ShieldCheck, Printer, Terminal, Eye, Sparkles, ArrowLeft } from 'lucide-react';
+import { Printer, Terminal, Sparkles } from 'lucide-react';
 import { mapSessionToAuditResult } from '../utils/auditMapper';
 import type { AuditPillar } from '../constants/pillars';
 import AuditProgressStepper from './AuditProgressStepper';
@@ -16,7 +16,19 @@ import PillarAssessment from './PillarAssessment';
 import RecommendationCard from './RecommendationCard';
 import RadarScoreChart from './RadarScoreChart';
 import AuditSummaryCard from './AuditSummaryCard';
+import TransformationPreviewSection from './TransformationPreviewSection';
 import type { AuditSession, AuditSessionItem, AuditItemResponse, AuditScoreSummary } from '../types';
+import {
+  ds,
+  AuditPage,
+  Section,
+  SectionHeader,
+  Card,
+  CardHeader,
+  CardBody,
+  ReportHeader,
+  MetaGrid,
+} from '@/design-system';
 
 interface Props {
   session: AuditSession & { items?: AuditSessionItem[]; responses?: AuditItemResponse[] };
@@ -26,43 +38,24 @@ interface Props {
 export default function AuditSessionSummary({ session, summary: legacySummary }: Props) {
   const [devMode, setDevMode] = useState(false);
 
-  // Map database session responses to future-compatible AuditResult contract
   const auditResult = mapSessionToAuditResult(session);
   const { overallScore, overallMaxScore, overallPercentage, overallRating, pillars, recommendations, summary, areaInfo } = auditResult;
 
-  // The primary workplace image for the audit is the post-improvement 'after' image, falling back to 'before'
   const primaryImage = session.generated_after_image_url || session.before_image_url || '';
 
-  const triggerPrint = () => {
-    window.print();
-  };
+  const triggerPrint = () => window.print();
 
   return (
-    <div className="space-y-8 font-sans w-full">
-      {/* 11. Audit Progress Stepper */}
+    <AuditPage>
       <AuditProgressStepper currentStep={3} />
 
-      {/* Industrial Audit Header */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm print:border-none print:shadow-none">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-xl">
-              AL
-            </div>
-            <div className="text-center sm:text-left">
-              <h1 className="text-xl font-black tracking-tight text-foreground uppercase">
-                ARCOLAB 5S Workplace Audit
-              </h1>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mt-0.5">
-                Digital Auditor Compliance Report
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 no-print">
-            <button
-              onClick={triggerPrint}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
-            >
+      {/* ── Report Header ─────────────────────────────────────────────── */}
+      <ReportHeader
+        title="ARCOLAB 5S Workplace Audit"
+        subtitle="Digital Auditor Compliance Report"
+        actions={
+          <>
+            <button onClick={triggerPrint} className={ds.interactive.ghostButton}>
               <Printer className="h-3.5 w-3.5" />
               Print / Export
             </button>
@@ -77,51 +70,30 @@ export default function AuditSessionSummary({ session, summary: legacySummary }:
               <Terminal className="h-3.5 w-3.5" />
               Dev Mode
             </button>
+          </>
+        }
+        meta={
+          <div className="space-y-4">
+            <MetaGrid rows={[
+              ['Company', areaInfo.companyName],
+              ['Date Conducted', areaInfo.auditDate],
+              ['Area / Workstation', areaInfo.areaName],
+              ['Auditor', areaInfo.auditor],
+            ]} />
+            <div className={ds.divider + ' pt-4'}>
+              <MetaGrid rows={[
+                ['Department', areaInfo.department],
+                ['Industry', areaInfo.industry],
+                ['Workspace Type', areaInfo.workspaceType],
+                ['Scoring Standard', 'Physical Audit 5S (0-4)'],
+              ]} />
+            </div>
           </div>
-        </div>
+        }
+      />
 
-        {/* Area Information Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 text-xs">
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Company</p>
-            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.companyName}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Date Conducted</p>
-            <p className="font-bold text-foreground mt-0.5">{areaInfo.auditDate}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Area / Workstation</p>
-            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.areaName}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Auditor</p>
-            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.auditor}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/40 mt-4 text-xs">
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Department</p>
-            <p className="font-semibold text-foreground mt-0.5">{areaInfo.department}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Industry</p>
-            <p className="font-semibold text-foreground mt-0.5">{areaInfo.industry}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Workspace Type</p>
-            <p className="font-semibold text-foreground mt-0.5">{areaInfo.workspaceType}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Scoring Standard</p>
-            <p className="font-semibold text-foreground mt-0.5">Physical Audit 5S (0-4 Rating)</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Interactive Pillar Navigation */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print">
+      {/* ── Pillar Navigation ─────────────────────────────────────────── */}
+      <div className={`${ds.pillarGrid} no-print`}>
         {pillars.map((pillar) => (
           <PillarCard
             key={pillar.name}
@@ -136,66 +108,62 @@ export default function AuditSessionSummary({ session, summary: legacySummary }:
         ))}
       </div>
 
-      {/* Split layout: Sticky Image Preview + Detailed Assessments */}
+      {/* ── Split layout ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* 4. Display the Uploaded Image During Assessment */}
         {primaryImage && (
-          <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
-                  Workplace Audit Evidence
-                </h4>
-                <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                  Audited State
-                </span>
-              </div>
-              <div className="relative overflow-hidden rounded-lg border border-border bg-muted">
-                <img
-                  src={primaryImage}
-                  alt="Audited Workspace"
-                  className="w-full h-auto max-h-96 object-contain rounded-lg"
-                />
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
-                Verify questions below against this active visual record.
-              </p>
-            </div>
+          <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 no-print">
+            <Card>
+              <CardHeader
+                badge={
+                  <span className={`${ds.badge.base} ${ds.badge.primary} text-[9px]`}>
+                    Audited State
+                  </span>
+                }
+              >
+                Workplace Audit Evidence
+              </CardHeader>
+              <CardBody className="space-y-3">
+                <div className="relative overflow-hidden rounded-lg border border-border bg-muted">
+                  <img
+                    src={primaryImage}
+                    alt="Audited Workspace"
+                    className="w-full h-auto max-h-96 object-contain rounded-lg"
+                  />
+                </div>
+                <p className={`${ds.type.meta} italic text-center leading-relaxed`}>
+                  Verify questions below against this active visual record.
+                </p>
+              </CardBody>
+            </Card>
           </div>
         )}
 
-        {/* Detailed Assessments */}
-        <div className={primaryImage ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between no-print">
-              <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
-                Detailed Pillar Checklist
-              </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold">
-                Click any row below to review observations
-              </span>
-            </div>
-            {pillars.map((pillar) => (
-              <PillarAssessment
-                key={pillar.name}
-                pillarKey={pillar.name as AuditPillar}
-                label={pillar.label}
-                jpName={pillar.jpName}
-                score={pillar.score}
-                maxScore={pillar.maxScore}
-                percentage={pillar.percentage}
-                rating={pillar.rating}
-                questions={pillar.questions}
-              />
-            ))}
-          </div>
+        <div className={primaryImage ? 'lg:col-span-2 space-y-5' : 'lg:col-span-3 space-y-5'}>
+          <SectionHeader
+            title="Detailed Pillar Checklist"
+            subtitle="Click any row below to review observations"
+            className="no-print"
+          />
+          {pillars.map((pillar) => (
+            <PillarAssessment
+              key={pillar.name}
+              pillarKey={pillar.name as AuditPillar}
+              label={pillar.label}
+              jpName={pillar.jpName}
+              score={pillar.score}
+              maxScore={pillar.maxScore}
+              percentage={pillar.percentage}
+              rating={pillar.rating}
+              questions={pillar.questions}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Print-only layout for Workplace Image */}
+      {/* Print-only image */}
       {primaryImage && (
         <div className="hidden print:block space-y-3 my-8">
-          <h4 className="text-xs font-black uppercase tracking-wider text-foreground border-b border-border pb-1">
+          <h4 className={`${ds.type.cardTitle} border-b border-border pb-1`}>
             Workplace Image Audit Evidence
           </h4>
           <img
@@ -206,95 +174,121 @@ export default function AuditSessionSummary({ session, summary: legacySummary }:
         </div>
       )}
 
-      {/* Overall score section (appears AFTER assessments) */}
-      <div className="print:break-inside-avoid">
+      {/* ── Overall Score ─────────────────────────────────────────────── */}
+      <Section>
         <AuditScoreCard
           score={overallScore}
           maxScore={overallMaxScore}
           percentage={overallPercentage}
           rating={overallRating}
         />
-      </div>
+      </Section>
 
-      {/* Radar Chart */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch print:break-inside-avoid">
-        <div className="md:col-span-1 flex flex-col justify-between space-y-4">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex-1 flex flex-col justify-center">
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground border-b border-border pb-2 mb-3">
-              Score Breakdown
-            </h4>
-            <div className="space-y-3 text-xs">
-              {pillars.map((p) => (
-                <div key={p.name} className="flex justify-between items-center">
-                  <span className="text-muted-foreground font-semibold">{p.label}</span>
-                  <span className="font-mono font-bold text-foreground">{p.score} / 16</span>
-                </div>
-              ))}
-            </div>
+      {/* ── Radar Chart + Score Breakdown ────────────────────────────── */}
+      <Section>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          <div className="md:col-span-1">
+            <Card className="h-full">
+              <CardHeader>Score Breakdown</CardHeader>
+              <CardBody className="space-y-3">
+                {pillars.map((p) => (
+                  <div key={p.name} className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground font-semibold">{p.label}</span>
+                    <span className="font-mono font-bold text-foreground">{p.score} / 16</span>
+                  </div>
+                ))}
+              </CardBody>
+            </Card>
+          </div>
+          <div className="md:col-span-2">
+            <RadarScoreChart pillars={pillars} />
           </div>
         </div>
-        <div className="md:col-span-2">
-          <RadarScoreChart pillars={pillars} />
-        </div>
-      </div>
+      </Section>
 
-      {/* Centralized Improvement Recommendations */}
-      <div className="space-y-3 print:break-inside-avoid">
-        <h3 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          Improvement Recommendations
-        </h3>
+      {/* ── Recommendations ───────────────────────────────────────────── */}
+      <Section>
+        <SectionHeader
+          title="Improvement Recommendations"
+          icon={<Sparkles className="h-4 w-4 text-amber-500" />}
+        />
         <RecommendationCard recommendations={recommendations} />
-      </div>
+      </Section>
 
-      {/* Executive Summary */}
-      <div className="print:break-inside-avoid">
+      {/* ── AI Workplace Transformation Preview ───────────────────────── */}
+      <Section>
+        <TransformationPreviewSection
+          auditId={session.id || 'past_session'}
+          beforeImage={primaryImage}
+          currentScore={overallScore}
+          maxScore={overallMaxScore}
+          currentPercentage={overallPercentage}
+          rating={overallRating}
+          context={{
+            areaName: areaInfo.areaName,
+            workspaceType: areaInfo.workspaceType,
+            industry: areaInfo.industry,
+            department: areaInfo.department,
+          }}
+          recommendations={recommendations.map((r) => ({
+            pillarName: r.pillarName,
+            problem: r.problem,
+            recommendation: r.recommendation,
+            priority: r.priority as 'high' | 'medium' | 'low',
+            expectedBenefit: r.expectedBenefit,
+            scoreGain: r.scoreGain,
+          }))}
+        />
+      </Section>
+
+      {/* ── Executive Summary ─────────────────────────────────────────── */}
+      <Section>
         <AuditSummaryCard summary={summary} />
-      </div>
+      </Section>
 
-      {/* PDF Download Button */}
-      <div className="flex gap-3 no-print">
-        <button
-          onClick={triggerPrint}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shadow-primary/10 cursor-pointer"
-        >
+      {/* ── Print Button ─────────────────────────────────────────────── */}
+      <div className="no-print">
+        <button onClick={triggerPrint} className={ds.interactive.primaryButton}>
           <Printer className="h-5 w-5" />
           Print Audit Report
         </button>
       </div>
 
-      {/* Developer Mode widgets */}
+      {/* ── Developer Mode ────────────────────────────────────────────── */}
       {devMode && (
-        <div className="bg-card border border-destructive/20 rounded-xl p-5 space-y-4 font-mono text-xs no-print">
-          <div className="flex items-center justify-between border-b border-border pb-2">
-            <h4 className="font-bold text-destructive flex items-center gap-1.5">
+        <Card className="border-destructive/20 no-print">
+          <CardHeader
+            badge={
+              <span className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded font-bold">
+                DEV ONLY
+              </span>
+            }
+          >
+            <span className="text-destructive flex items-center gap-1.5 font-mono">
               <Terminal className="h-4 w-4" />
               Developer Audit Session Logs
-            </h4>
-            <span className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded font-bold">
-              DEV ONLY
             </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[10px] text-muted-foreground font-bold uppercase">Vision Model Used</p>
-              <p className="text-foreground mt-0.5 font-mono">{session.vision_model_used || 'N/A'}</p>
+          </CardHeader>
+          <CardBody className="font-mono text-xs space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className={ds.type.label}>Vision Model Used</p>
+                <p className="text-foreground mt-0.5">{session.vision_model_used || 'N/A'}</p>
+              </div>
+              <div>
+                <p className={ds.type.label}>Prompt Version ID</p>
+                <p className="text-foreground mt-0.5">{session.prompt_version_id || 'N/A'}</p>
+              </div>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground font-bold uppercase">Prompt Version ID</p>
-              <p className="text-foreground mt-0.5 font-mono">{session.prompt_version_id || 'N/A'}</p>
+              <p className={ds.type.label}>Full Database Session Record</p>
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border mt-1">
+                {JSON.stringify(session, null, 2)}
+              </pre>
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Full Database Session Record</p>
-            <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border">
-              {JSON.stringify(session, null, 2)}
-            </pre>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       )}
-    </div>
+    </AuditPage>
   );
 }

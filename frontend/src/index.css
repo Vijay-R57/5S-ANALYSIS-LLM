@@ -110,6 +110,7 @@
 }
 
 @layer utilities {
+  /* ── Page layout ──────────────────────────────────────────── */
   .section-padding {
     @apply px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24;
   }
@@ -117,18 +118,83 @@
   .container-max {
     @apply max-w-7xl mx-auto;
   }
+
+  /* ── ARCOLAB Design System ────────────────────────────────── */
+
+  /* Audit page root — consistent vertical rhythm */
+  .ds-page {
+    @apply space-y-6 font-sans;
+  }
+
+  /* Standard card shell */
+  .ds-card {
+    @apply bg-card border border-border rounded-xl shadow-sm overflow-hidden;
+  }
+
+  /* Card header bar */
+  .ds-card-header {
+    @apply px-5 py-4 border-b border-border bg-muted/20 flex items-center justify-between;
+  }
+
+  /* Card header title */
+  .ds-card-title {
+    @apply text-xs font-black uppercase tracking-wider text-foreground;
+  }
+
+  /* Card body */
+  .ds-card-body {
+    @apply p-5 space-y-5;
+  }
+
+  /* Metric stat cell */
+  .ds-metric-cell {
+    @apply bg-muted/10 border border-border/50 rounded-lg p-3 text-center;
+  }
+
+  /* Section title */
+  .ds-section-title {
+    @apply text-sm font-black uppercase tracking-wider text-foreground;
+  }
+
+  /* Label micro-cap */
+  .ds-label {
+    @apply text-[10px] text-muted-foreground uppercase font-bold tracking-wider;
+  }
+
+  /* Body text */
+  .ds-body {
+    @apply text-xs text-foreground leading-relaxed;
+  }
+
+  /* Detail card (inside question expand) */
+  .ds-detail-card {
+    @apply bg-muted/20 border border-border/40 rounded-lg p-3.5 space-y-2;
+  }
+
+  /* Fade-in animation for collapsible content */
+  .animate-fade-in {
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }
 
+/* ── Print Styles ─────────────────────────────────────────────────────────── */
 @media print {
   body {
     background: white !important;
     color: black !important;
+    font-size: 11pt;
+    line-height: 1.5;
   }
-  
+
   .no-print {
     display: none !important;
   }
-  
+
   .print-page-break {
     page-break-before: always !important;
   }
@@ -142,5 +208,26 @@
     box-shadow: none !important;
     border: 1px solid #e2e8f0 !important;
   }
-}
 
+  /* Ensure audit cards print cleanly */
+  .ds-card {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    break-inside: avoid;
+  }
+
+  /* Give each pillar section breathing room when printed */
+  .print\:break-inside-avoid {
+    break-inside: avoid;
+  }
+
+  .print\:mb-8 {
+    margin-bottom: 2rem;
+  }
+
+  /* Consistent print margins */
+  @page {
+    margin: 18mm 18mm 18mm 18mm;
+    size: A4 portrait;
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "5SComparisonAnalysisResult",
+  "type": "object",
+  "properties": {
+    "overview": { "type": "string" },
+    "scoring_method": { "type": "string", "enum": ["Gemini Vision"] },
+    "comparison_summary": { "type": "string" },
+    "before_scores": {
+      "type": "object",
+      "properties": {
+        "sort": { "type": "number", "minimum": 0, "maximum": 20 },
+        "set_in_order": { "type": "number", "minimum": 0, "maximum": 20 },
+        "shine": { "type": "number", "minimum": 0, "maximum": 20 },
+        "standardize": { "type": "number", "minimum": 0, "maximum": 20 },
+        "sustain": { "type": "number", "minimum": 0, "maximum": 20 }
+      },
+      "required": ["sort", "set_in_order", "shine", "standardize", "sustain"]
+    },
+    "after_scores": {
+      "type": "object",
+      "properties": {
+        "sort": { "type": "number", "minimum": 0, "maximum": 20 },
+        "set_in_order": { "type": "number", "minimum": 0, "maximum": 20 },
+        "shine": { "type": "number", "minimum": 0, "maximum": 20 },
+        "standardize": { "type": "number", "minimum": 0, "maximum": 20 },
+        "sustain": { "type": "number", "minimum": 0, "maximum": 20 }
+      },
+      "required": ["sort", "set_in_order", "shine", "standardize", "sustain"]
+    },
+    "before_explanations": {
+      "type": "object",
+      "properties": {
+        "sort": { "type": "string" },
+        "set_in_order": { "type": "string" },
+        "shine": { "type": "string" },
+        "standardize": { "type": "string" },
+        "sustain": { "type": "string" }
+      }
+    },
+    "after_explanations": {
+      "type": "object",
+      "properties": {
+        "sort": { "type": "string" },
+        "set_in_order": { "type": "string" },
+        "shine": { "type": "string" },
+        "standardize": { "type": "string" },
+        "sustain": { "type": "string" }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "improvements": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "root_cause_observations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "safety_recommendations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "lean_maintenance_score": { "type": "number", "minimum": 0, "maximum": 20 },
+    "lean_maintenance_score_after": { "type": "number", "minimum": 0, "maximum": 20 },
+    "lean_maintenance_explanation": { "type": "string" }
+  },
+  "required": ["overview", "before_scores", "after_scores", "recommendations", "improvements"]
+}

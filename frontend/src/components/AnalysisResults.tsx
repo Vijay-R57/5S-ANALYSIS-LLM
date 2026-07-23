@@ -1,13 +1,13 @@
 /**
  * src/components/AnalysisResults.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Redesigned 5S Workplace Audit Report Dashboard (Phase 3A Redesign).
- * Emulates a professional digital industrial 5S audit checklist sheet.
- * Single workplace image workflow; displays executive summary and audit timeline.
+ * ARCOLAB 5S Workplace Audit Report Dashboard.
+ * Uses the global ARCOLAB Design System for consistent layout, spacing,
+ * typography, and PDF rendering standards.
  */
 
 import React, { useState } from 'react';
-import { Download, ShieldCheck, Printer, Terminal, Eye, Sparkles } from 'lucide-react';
+import { Download, Terminal, Sparkles } from 'lucide-react';
 import { mapAnalysisResultToAuditResult } from '@/modules/audit/utils/auditMapper';
 import AuditProgressStepper from '@/modules/audit/components/AuditProgressStepper';
 import AuditScoreCard from '@/modules/audit/components/AuditScoreCard';
@@ -19,7 +19,22 @@ import RadarScoreChart from '@/modules/audit/components/RadarScoreChart';
 import AuditSummaryCard from '@/modules/audit/components/AuditSummaryCard';
 import AuditTimelineComponent from '@/modules/audit/components/AuditTimeline';
 import type { AuditAnalysisResult, AuditTimeline } from '@/types/analysis';
+import TransformationPreviewSection from '@/modules/audit/components/TransformationPreviewSection';
+import { getCachedTransformationPreview } from '@/modules/audit/services/workplaceTransformationService';
 import { jsPDF } from 'jspdf';
+import {
+  ds,
+  PDF,
+  contentWidth,
+  AuditPage,
+  Section,
+  SectionHeader,
+  Card,
+  CardHeader,
+  CardBody,
+  ReportHeader,
+  MetaGrid,
+} from '@/design-system';
 
 interface Props {
   data: AuditAnalysisResult;
@@ -67,338 +82,417 @@ export default function AnalysisResults({
       format: 'a4'
     });
 
-    let y = 15;
-    const margin = 15;
+    // ── PDF design-system tokens ──────────────────────────────────────────────
+    const margin = PDF.margin;
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
+    const cw = contentWidth(pageWidth);   // design-system helper
+    let y = margin;
+
+    // ── PDF Helpers (design-system driven) ──────────────────────────────────
+    const addPageHeader = () => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(PDF.font.runningHead);
+      doc.setTextColor(...PDF.color.muted);
+      doc.text('ARCOLAB 5S WORKPLACE AUDIT REPORT  ·  CONFIDENTIAL', margin, 10);
+      doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, 10, { align: 'right' });
+      doc.setDrawColor(...PDF.color.rule);
+      doc.setLineWidth(0.2);
+      doc.line(margin, 12, pageWidth - margin, 12);
+    };
+
+    const addPageFooter = () => {
+      const footerY = pageHeight - 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...PDF.color.muted);
+      doc.text(`Generated: ${new Date().toLocaleString()}  ·  ARCOLAB Digital Auditor`, margin, footerY);
+      doc.setDrawColor(...PDF.color.rule);
+      doc.setLineWidth(0.2);
+      doc.line(margin, footerY - 3, pageWidth - margin, footerY - 3);
+    };
 
     const checkPageBreak = (needed: number) => {
-      if (y + needed > pageHeight - 15) {
+      if (y + needed > pageHeight - 18) {
+        addPageFooter();
         doc.addPage();
-        y = 15;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text('ARCOLAB 5S Workplace Audit Report', margin, 10);
-        doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin - 10, 10);
-        doc.setLineWidth(0.2);
-        doc.setDrawColor(230, 230, 230);
-        doc.line(margin, 12, pageWidth - margin, 12);
+        y = 18;
+        addPageHeader();
       }
     };
 
-    // Header Panel
-    doc.setFillColor(26, 80, 54);
-    doc.rect(margin, y, pageWidth - (margin * 2), 20, 'F');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.text('ARCOLAB 5S WORKPLACE AUDIT REPORT', margin + 5, y + 8);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text('DIGITAL AUDITOR COMPLIANCE RECORD', margin + 5, y + 15);
-    y += 26;
+    const sectionTitle = (title: string) => {
+      checkPageBreak(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(PDF.font.sectionTitle);
+      doc.setTextColor(...PDF.color.dark);
+      doc.text(title, margin, y);
+      y += 3;
+      doc.setDrawColor(...PDF.color.rule);
+      doc.setLineWidth(0.25);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += PDF.afterSectionTitle;
+    };
 
-    // Metadata details
+    // ── Cover Header ───────────────────────────────────────────
+    doc.setFillColor(...PDF.color.brand);
+    doc.rect(margin, y, cw, 24, 'F');
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text('AUDIT INFORMATION', margin, y);
-    y += 4;
+    doc.setFontSize(PDF.font.cover);
+    doc.setTextColor(...PDF.color.white);
+    doc.text('ARCOLAB 5S WORKPLACE AUDIT REPORT', margin + 6, y + 9);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(PDF.font.bodySm);
+    doc.setTextColor(...PDF.color.coverSubtitle);
+    doc.text('DIGITAL AUDITOR COMPLIANCE RECORD  ·  CONFIDENTIAL', margin + 6, y + 17);
+    y += 30;
+
+    // ── Audit Metadata ────────────────────────────────────────
+    sectionTitle('AUDIT INFORMATION');
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(...PDF.color.mid);
+
+    const lx = margin + PDF.colIndent;
+    const rx = margin + cw / 2 + PDF.colRightOffset;
+    const rowH = PDF.metaRowHeight;
+
+    const metaRows: [string, string][] = [
+      [`Company: ${areaInfo.companyName}`, `Date Conducted: ${areaInfo.auditDate}`],
+      [`Auditor: ${areaInfo.auditor}`, `Area / Station: ${areaInfo.areaName}`],
+      [`Department: ${areaInfo.department}`, `Industry: ${areaInfo.industry}`],
+      [`Workspace Type: ${areaInfo.workspaceType}`, `Scoring Standard: Physical Audit 5S (0–4)`],
+    ];
+    metaRows.forEach(([left, right]) => {
+      doc.text(left, lx, y);
+      doc.text(right, rx, y);
+      y += rowH;
+    });
+    y += 6;
+
+    // ── Executive Summary Box ─────────────────────────────────
+    checkPageBreak(36);
+    doc.setFillColor(...PDF.color.cardBg);
+    doc.setDrawColor(...PDF.color.cardBorder);
     doc.setLineWidth(0.3);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 6;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(80, 80, 80);
-
-    const leftColX = margin;
-    const rightColX = pageWidth / 2 + 5;
-
-    // Left Column
-    doc.text(`Company: ${areaInfo.companyName}`, leftColX, y); y += 5;
-    doc.text(`Auditor: ${areaInfo.auditor}`, leftColX, y); y += 5;
-    doc.text(`Department: ${areaInfo.department}`, leftColX, y); y += 5;
-    doc.text(`Workspace Type: ${areaInfo.workspaceType}`, leftColX, y); y += 5;
-
-    // Reset y for right column
-    let yRight = y - 20;
-    doc.text(`Date Conducted: ${areaInfo.auditDate}`, rightColX, yRight); yRight += 5;
-    doc.text(`Area / Station: ${areaInfo.areaName}`, rightColX, yRight); yRight += 5;
-    doc.text(`Industry: ${areaInfo.industry}`, rightColX, yRight); yRight += 5;
-    doc.text(`Scoring Standard: Physical Audit 5S (0-4 Rating)`, rightColX, yRight);
-
-    y += 6;
-
-    // Summary Card (Border box)
-    checkPageBreak(40);
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(margin, y, pageWidth - (margin * 2), 32, 'FD');
+    doc.roundedRect(margin, y, cw, 34, 2, 2, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(80, 100, 120);
     doc.text('EXECUTIVE COMPLIANCE SUMMARY', margin + 5, y + 6);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(26, 80, 54);
-    doc.text(`Overall Score: ${overallScore} / ${overallMaxScore} (${overallPercentage}%)`, margin + 5, y + 14);
+    doc.setFontSize(PDF.font.headline);
+    doc.setTextColor(...PDF.color.brand);
+    doc.text(`Overall Score: ${overallScore} / ${overallMaxScore}  (${overallPercentage}%)`, margin + 5, y + 15);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Rating: ${overallRating.toUpperCase()}`, margin + 5, y + 21);
-    doc.text(`Critical Findings: ${enhancedSummary.criticalFindings}`, margin + 5, y + 27);
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(...PDF.color.mid);
+    doc.text(`Rating: ${overallRating.toUpperCase()}   |   Critical Findings: ${enhancedSummary.criticalFindings}`, margin + 5, y + 22);
+    doc.text(`Audit Confidence: ${enhancedSummary.auditConfidence !== null ? enhancedSummary.auditConfidence + '%' : 'N/A'}`, margin + 5, y + 28);
 
-    const sumRightX = pageWidth / 2 + 10;
-    doc.text(`Highest Pillar: ${enhancedSummary.highestPillar}`, sumRightX, y + 14);
-    doc.text(`Lowest Pillar: ${enhancedSummary.lowestPillar}`, sumRightX, y + 20);
-    doc.text(`Image Quality: ${enhancedSummary.imageQualityScore !== null ? `${enhancedSummary.imageQualityScore}/100 (${enhancedSummary.imageQualityLevel})` : 'N/A'}`, sumRightX, y + 26);
+    doc.text(`Highest Pillar: ${enhancedSummary.highestPillar}`, rx, y + 15);
+    doc.text(`Lowest Pillar: ${enhancedSummary.lowestPillar}`, rx, y + 22);
+    doc.text(`Image Quality: ${enhancedSummary.imageQualityScore !== null ? `${enhancedSummary.imageQualityScore}/100 (${enhancedSummary.imageQualityLevel})` : 'N/A'}`, rx, y + 28);
+    y += 40;
 
-    y += 38;
+    // ── Pillar Score Table ────────────────────────────────────
+    checkPageBreak(48);
+    sectionTitle('5S PILLAR SCORE BREAKDOWN');
 
-    // Pillar Scores
-    checkPageBreak(45);
+    // Table header
+    doc.setFillColor(...PDF.color.tableHead);
+    doc.rect(margin, y - 1, cw, 7, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text('5S PILLAR SCORE BREAKDOWN', margin, y);
-    y += 4;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 6;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Pillar', margin + 5, y);
-    doc.text('Score', margin + 60, y);
-    doc.text('Compliance', margin + 90, y);
-    doc.text('Rating', margin + 130, y);
-    y += 5;
+    doc.setFontSize(PDF.font.bodySm);
+    doc.setTextColor(...PDF.color.mid);
+    doc.text('Pillar', margin + 4, y + 4);
+    doc.text('Score', margin + 70, y + 4);
+    doc.text('Compliance %', margin + 100, y + 4);
+    doc.text('Rating', margin + 142, y + 4);
+    y += 9;
 
     doc.setLineWidth(0.1);
-    doc.line(margin, y, pageWidth - margin, y);
+    doc.setDrawColor(...PDF.color.rule);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(PDF.font.body);
+    pillars.forEach((p, i) => {
+      if (i % 2 === 0) {
+        doc.setFillColor(...PDF.color.rowTint);
+        doc.rect(margin, y - 3, cw, 6.5, 'F');
+      }
+      doc.setTextColor(...PDF.color.dark);
+      doc.text(p.label, margin + 4, y + 2);
+      doc.text(`${p.score} / ${p.maxScore}`, margin + 70, y + 2);
+      doc.text(`${p.percentage}%`, margin + 100, y + 2);
+      doc.text(p.rating, margin + 142, y + 2);
+      y += 6.5;
+    });
+    y += PDF.blockGap;
+
+    // ── Strengths & Weaknesses ────────────────────────────────
+    checkPageBreak(50);
+    sectionTitle('STRENGTHS & AREAS OF CONCERN');
+
+    const strLeft = margin + 3;
+    const strMaxWidth = (pageWidth - margin) - strLeft - 2;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(...PDF.color.success);
+    doc.text('Overall Strengths:', margin, y);
     y += 5;
 
     doc.setFont('helvetica', 'normal');
-    pillars.forEach((p) => {
-      doc.text(p.label, margin + 5, y);
-      doc.text(`${p.score} / ${p.maxScore}`, margin + 60, y);
-      doc.text(`${p.percentage}%`, margin + 90, y);
-      doc.text(p.rating, margin + 130, y);
-      y += 6;
-    });
-
-    y += 6;
-
-    // Strengths and Weaknesses
-    checkPageBreak(50);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text('STRENGTHS & AREAS OF CONCERN', margin, y);
-    y += 4;
-    doc.setLineWidth(0.3);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 6;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(22, 101, 52);
-    doc.text('Overall Strengths:', margin, y);
-    y += 4.5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(...PDF.color.mid);
     enhancedSummary.strengths.forEach((str) => {
-      doc.text(`• ${str}`, margin + 3, y);
-      y += 4.5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(PDF.font.body);
+      const lines = doc.splitTextToSize(`• ${str}`, strMaxWidth);
+      checkPageBreak(lines.length * PDF.lineHeight + 2);
+      doc.text(lines, strLeft, y);
+      y += lines.length * PDF.lineHeight;
     });
 
-    y += 2;
+    y += 4;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(180, 83, 9);
-    doc.text('Areas of Concern / Weaknesses:', margin, y);
-    y += 4.5;
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(...PDF.color.warning);
+    doc.text('Areas of Concern:', margin, y);
+    y += 5;
+
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(PDF.font.body);
+    doc.setTextColor(...PDF.color.mid);
     enhancedSummary.weaknesses.forEach((weak) => {
-      doc.text(`• ${weak}`, margin + 3, y);
-      y += 4.5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(PDF.font.body);
+      const lines = doc.splitTextToSize(`• ${weak}`, strMaxWidth);
+      checkPageBreak(lines.length * PDF.lineHeight + 2);
+      doc.text(lines, strLeft, y);
+      y += lines.length * PDF.lineHeight;
     });
+    y += PDF.sectionGap;
 
-    y += 6;
-
-    // Recommendations
+    // ── Recommendations ───────────────────────────────────────
     if (recommendations && recommendations.length > 0) {
       checkPageBreak(40);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(50, 50, 50);
-      doc.text('CORRECTIVE ACTION RECOMMENDATIONS', margin, y);
-      y += 4;
-      doc.setLineWidth(0.3);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 6;
+      sectionTitle('CORRECTIVE ACTION RECOMMENDATIONS');
 
       recommendations.forEach((rec, idx) => {
-        checkPageBreak(25);
+        const hLeft = margin + 2;
+        const hMaxWidth = (pageWidth - margin) - hLeft - 2;
+
+        const bodyLeft = margin + PDF.bodyIndent;
+        const bodyMaxWidth = (pageWidth - margin) - bodyLeft - 2;
+
+        // 1. Measure Rec Header
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(50, 50, 50);
-        doc.text(`${idx + 1}. [${rec.priority.toUpperCase()} ACTION] ${rec.problem}`, margin, y);
-        y += 4.5;
+        doc.setFontSize(PDF.font.body);
+        const header = `${String(idx + 1).padStart(2, '0')}. [${rec.priority.toUpperCase()} ACTION]  ${rec.problem}`;
+        const headerLines = doc.splitTextToSize(header, hMaxWidth);
 
+        // 2. Measure Action Text
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(PDF.font.bodySm);
+        const recLines = doc.splitTextToSize(`Action: ${rec.recommendation}`, bodyMaxWidth);
+
+        // 3. Measure Benefit Text
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(80, 80, 80);
-        
-        const recText = doc.splitTextToSize(`Recommendation: ${rec.recommendation}`, pageWidth - (margin * 2) - 5);
-        doc.text(recText, margin + 3, y);
-        y += (recText.length * 4);
+        doc.setFontSize(PDF.font.micro);
+        const benefit = doc.splitTextToSize(`Benefit: ${rec.expectedBenefit}  |  Est. Score Gain: +${rec.scoreGain} pt(s)`, bodyMaxWidth);
 
-        const benefitText = `Expected Benefit: ${rec.expectedBenefit} | Est. Score Gain: +${rec.scoreGain} point(s)`;
-        doc.text(benefitText, margin + 3, y);
-        y += 7;
+        const totalH = headerLines.length * PDF.lineHeight + PDF.lineHeight + recLines.length * PDF.lineHeightSm + benefit.length * PDF.lineHeightSm + 8;
+        checkPageBreak(totalH);
+
+        // Render Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(PDF.font.body);
+        doc.setTextColor(...PDF.color.dark);
+        doc.text(headerLines, hLeft, y);
+        y += headerLines.length * PDF.lineHeight + 1;
+
+        // Render Pillar Tag
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(PDF.font.micro);
+        doc.setTextColor(...PDF.color.muted);
+        doc.text(`Pillar: ${rec.pillarName.toUpperCase()}`, bodyLeft, y);
+        y += PDF.lineHeight;
+
+        // Render Action Text
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(PDF.font.bodySm);
+        doc.setTextColor(30, 80, 55);
+        doc.text(recLines, bodyLeft, y);
+        y += recLines.length * PDF.lineHeightSm;
+
+        // Render Benefit Text
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(PDF.font.micro);
+        doc.setTextColor(...PDF.color.mid);
+        doc.text(benefit, bodyLeft, y);
+        y += benefit.length * PDF.lineHeightSm + 5;
       });
     }
 
-    // Detailed Question-by-Question Assessment Section
-    checkPageBreak(30);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text('DETAILED QUESTION ASSESSMENT', margin, y);
-    y += 4;
-    doc.setLineWidth(0.3);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 6;
+    // ── Detailed Question Assessment ──────────────────────────
+    checkPageBreak(20);
+    sectionTitle('DETAILED QUESTION ASSESSMENT');
 
     pillars.forEach((p) => {
-      checkPageBreak(20);
+      checkPageBreak(16);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(26, 80, 54);
-      doc.text(`${p.label.toUpperCase()} PILLAR (${p.score} / ${p.maxScore})`, margin, y);
-      y += 5;
-
-      p.questions.forEach((q, idx) => {
-        const ratingEnum = q.score === 4 ? 'VERY_GOOD' :
-                           q.score === 3 ? 'GOOD' :
-                           q.score === 2 ? 'AVERAGE' :
-                           q.score === 1 ? 'BAD' : 'VERY_BAD';
-
-        // Question header
-        const qNum = `${idx + 1}. `;
-        const qHeader = `${qNum}${q.question}`;
-        const qHeaderLines = doc.splitTextToSize(qHeader, pageWidth - (margin * 2) - 6);
-        
-        // Score & rating enum line
-        const scoreRatingText = `Score: ${q.score}/4  |  Rating: ${ratingEnum}`;
-        
-        // Evidence & Reason lines
-        const evidenceText = q.evidence ? `Evidence: ${q.evidence}` : 'Evidence: None recorded.';
-        const reasonText = q.reason ? `Reasoning: ${q.reason}` : 'Reasoning: None recorded.';
-        const evidenceLines = doc.splitTextToSize(evidenceText, pageWidth - (margin * 2) - 8);
-        const reasonLines = doc.splitTextToSize(reasonText, pageWidth - (margin * 2) - 8);
-        
-        const blockHeight = (qHeaderLines.length * 4.5) + 5 + (evidenceLines.length * 4) + (reasonLines.length * 4) + 6;
-        checkPageBreak(blockHeight);
-
-        // Render question text
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.setTextColor(60, 60, 60);
-        doc.text(qHeaderLines, margin + 2, y);
-        y += (qHeaderLines.length * 4.5);
-
-        // Render score & rating
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(26, 80, 54);
-        doc.text(scoreRatingText, margin + 4, y);
-        y += 4.5;
-
-        // Render evidence
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(80, 80, 80);
-        doc.text(evidenceLines, margin + 4, y);
-        y += (evidenceLines.length * 4);
-
-        // Render reason
-        doc.text(reasonLines, margin + 4, y);
-        y += (reasonLines.length * 4) + 4;
-      });
-      y += 2;
-    });
-
-    // Timeline Footer
-    if (timeline) {
-      checkPageBreak(35);
-      y += 2;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(50, 50, 50);
-      doc.text('AUDIT LOG TIMELINE', margin, y);
-      y += 4;
-      doc.setLineWidth(0.3);
-      doc.line(margin, y, pageWidth - margin, y);
+      doc.setFontSize(PDF.font.subTitle);
+      doc.setTextColor(...PDF.color.brand);
+      doc.text(`${p.label.toUpperCase()}  (${p.score} / ${p.maxScore} pts  ·  ${p.percentage}%)`, margin, y);
       y += 6;
 
+      p.questions.forEach((q, idx) => {
+        const ratingLabel =
+          q.score === 4 ? 'VERY GOOD' :
+          q.score === 3 ? 'GOOD' :
+          q.score === 2 ? 'AVERAGE' :
+          q.score === 1 ? 'BAD' : 'VERY BAD';
+        const reasonText = q.reason ? `Reason: ${q.reason}` : 'Reason: Not recorded.';
+
+        // CRITICAL FIX: Explicitly set font & size BEFORE measuring Question text
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(PDF.font.body);
+        const qLeft = margin + 3;
+        const qMaxWidth = (pageWidth - margin) - qLeft - 2;
+        const qLines = doc.splitTextToSize(`${idx + 1}. ${q.question}`, qMaxWidth);
+
+        // CRITICAL FIX: Explicitly set font & size BEFORE measuring Reason text
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(PDF.font.micro);
+        const reasonLeft = margin + 5;
+        const reasonMaxWidth = (pageWidth - margin) - reasonLeft - 2;
+        const reasonLines = doc.splitTextToSize(reasonText, reasonMaxWidth);
+
+        const blockH = qLines.length * PDF.lineHeight + reasonLines.length * PDF.lineHeightSm + 12;
+        checkPageBreak(blockH);
+
+        // Render Question
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(PDF.font.body);
+        doc.setTextColor(...PDF.color.dark);
+        doc.text(qLines, qLeft, y);
+        y += qLines.length * PDF.lineHeight;
+
+        // Render Score & rating
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(PDF.font.micro);
+        doc.setTextColor(...PDF.color.brand);
+        doc.text(`Score: ${q.score} / 4  ·  ${ratingLabel}`, margin + 5, y);
+        y += PDF.lineHeight;
+
+        // Render Reason
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(PDF.font.micro);
+        doc.setTextColor(...PDF.color.mid);
+        doc.text(reasonLines, reasonLeft, y);
+        y += reasonLines.length * PDF.lineHeightSm + 4;
+      });
+      y += 3;
+    });
+
+    // ── Timeline Footer ───────────────────────────────────────
+    if (timeline) {
+      checkPageBreak(30);
+      sectionTitle('AUDIT LOG TIMELINE');
+
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(PDF.font.bodySm);
+      doc.setTextColor(...PDF.color.muted);
 
-      const formatTS = (iso: string | null) => {
-        if (!iso) return 'N/A';
-        return new Date(iso).toLocaleString();
-      };
+      const formatTS = (iso: string | null) => iso ? new Date(iso).toLocaleString() : 'N/A';
 
-      doc.text(`Image Uploaded: ${formatTS(timeline.imageUploaded)}`, margin + 2, y); y += 4;
-      doc.text(`Validation Completed: ${formatTS(timeline.validationComplete)}`, margin + 2, y); y += 4;
-      doc.text(`Audit Started: ${formatTS(timeline.auditStarted)}`, margin + 2, y); y += 4;
-      doc.text(`Audit Completed: ${formatTS(timeline.auditCompleted)}`, margin + 2, y);
+      [
+        `Image Uploaded:        ${formatTS(timeline.imageUploaded)}`,
+        `Validation Completed:  ${formatTS(timeline.validationComplete)}`,
+        `Audit Started:         ${formatTS(timeline.auditStarted)}`,
+        `Audit Completed:       ${formatTS(timeline.auditCompleted)}`,
+      ].forEach((line) => {
+        doc.text(line, margin + 2, y); y += 5;
+      });
     }
 
-    doc.save(`5S-Audit-Report-${areaInfo.areaName.replace(/\s+/g, '-')}-${areaInfo.auditDate.replace(/\s+/g, '-')}.pdf`);
+    // ── AI Workplace Transformation Preview (PDF) ──────────────
+    const previewResult = getCachedTransformationPreview(areaInfo.areaName || 'current_audit');
+    if (previewResult && previewResult.status === 'complete') {
+      checkPageBreak(75);
+      sectionTitle('AI WORKPLACE TRANSFORMATION PREVIEW');
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(PDF.font.bodySm);
+      doc.setTextColor(...PDF.color.mid);
+      const capLines = doc.splitTextToSize(
+        'AI-generated conceptual visualization illustrating expected workplace conditions after implementing the recommended corrective actions and 5S principles.',
+        cw - 4
+      );
+      doc.text(capLines, margin + 2, y);
+      y += capLines.length * PDF.lineHeightSm + 3;
+
+      // Badges line
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(PDF.font.micro);
+      doc.setTextColor(...PDF.color.brand);
+      doc.text(`BEFORE · CURRENT ${overallPercentage}%   ➔   AFTER · ILLUSTRATIVE TARGET ${previewResult.illustrativeTargetPercentage}% (${previewResult.targetRating.replace('_', ' ')})`, margin + 2, y);
+      y += 6;
+
+      // Side-by-side or stacked images box
+      const boxW = (cw - 4) / 2;
+      const boxH = 45;
+
+      try {
+        const cleanBefore = workplaceImage.replace(/^__geo:[^_]*__/, '');
+        doc.addImage(cleanBefore, 'JPEG', margin, y, boxW, boxH);
+        doc.addImage(previewResult.transformedImageUrl, 'JPEG', margin + boxW + 4, y, boxW, boxH);
+        y += boxH + 4;
+      } catch {
+        y += 6;
+      }
+
+      // Mandatory Industrial Disclaimer Box
+      doc.setFillColor(...PDF.color.cardBg);
+      doc.setDrawColor(...PDF.color.cardBorder);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(margin, y, cw, 14, 1.5, 1.5, 'FD');
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...PDF.color.muted);
+      const discText =
+        'Disclaimer: This visualization is AI-generated for planning and communication purposes. It represents an expected workplace condition after implementing recommended 5S principles. It is an illustrative conceptual forecast and does not constitute an actual post-implementation photograph or a second formal audit result.';
+      const discLines = doc.splitTextToSize(discText, cw - 6);
+      doc.text(discLines, margin + 3, y + 4);
+      y += 18;
+    }
+
+    addPageFooter();
+    doc.save(`5S-Audit-${areaInfo.areaName.replace(/\s+/g, '-')}-${areaInfo.auditDate.replace(/\s+/g, '-')}.pdf`);
   };
 
 
   return (
-    <div className="space-y-8 font-sans">
-      {/* 11. Audit Progress Stepper */}
+    <AuditPage>
+      {/* Progress Stepper */}
       <AuditProgressStepper currentStep={6} />
 
-      {/* Industrial Audit Header */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm print:border-none print:shadow-none">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-xl">
-              AL
-            </div>
-            <div className="text-center sm:text-left">
-              <h1 className="text-xl font-black tracking-tight text-foreground uppercase">
-                ARCOLAB 5S Workplace Audit
-              </h1>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mt-0.5">
-                Digital Auditor Compliance Report
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 no-print">
-            <button
-              onClick={handleDownloadPDF}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
-            >
+      {/* ── Report Header ─────────────────────────────────────────────── */}
+      <ReportHeader
+        title="ARCOLAB 5S Workplace Audit"
+        subtitle="Digital Auditor Compliance Report"
+        actions={
+          <>
+            <button onClick={handleDownloadPDF} className={ds.interactive.ghostButton}>
               <Download className="h-3.5 w-3.5" />
               Download Report
             </button>
@@ -413,56 +507,35 @@ export default function AnalysisResults({
               <Terminal className="h-3.5 w-3.5" />
               Dev Mode
             </button>
+          </>
+        }
+        meta={
+          <div className="space-y-4">
+            <MetaGrid rows={[
+              ['Company', areaInfo.companyName],
+              ['Date Conducted', areaInfo.auditDate],
+              ['Area / Workstation', areaInfo.areaName],
+              ['Auditor', areaInfo.auditor],
+            ]} />
+            <div className={ds.divider + ' pt-4'}>
+              <MetaGrid rows={[
+                ['Department', areaInfo.department],
+                ['Industry', areaInfo.industry],
+                ['Workspace Type', areaInfo.workspaceType],
+                ['Scoring Standard', 'Physical Audit 5S (0-4)'],
+              ]} />
+            </div>
           </div>
-        </div>
+        }
+      />
 
-        {/* Area Information Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 text-xs">
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Company</p>
-            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.companyName}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Date Conducted</p>
-            <p className="font-bold text-foreground mt-0.5">{areaInfo.auditDate}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Area / Workstation</p>
-            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.areaName}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Auditor</p>
-            <p className="font-bold text-foreground mt-0.5 truncate">{areaInfo.auditor}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/40 mt-4 text-xs">
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Department</p>
-            <p className="font-semibold text-foreground mt-0.5">{areaInfo.department}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Industry</p>
-            <p className="font-semibold text-foreground mt-0.5">{areaInfo.industry}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Workspace Type</p>
-            <p className="font-semibold text-foreground mt-0.5">{areaInfo.workspaceType}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Scoring Standard</p>
-            <p className="font-semibold text-foreground mt-0.5">Physical Audit 5S (0-4 Rating)</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Executive Summary - Promoted to the top section of the report */}
-      <div className="print:break-inside-avoid">
+      {/* ── Executive Summary ─────────────────────────────────────────── */}
+      <Section>
         <AuditSummaryCard summary={enhancedSummary} />
-      </div>
+      </Section>
 
-      {/* 3. Interactive Pillar Navigation */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print">
+      {/* ── Pillar Navigation ─────────────────────────────────────────── */}
+      <div className={`${ds.pillarGrid} no-print`}>
         {pillars.map((pillar) => (
           <PillarCard
             key={pillar.name}
@@ -477,63 +550,61 @@ export default function AnalysisResults({
         ))}
       </div>
 
-      {/* Split layout: Sticky Image Preview + Detailed Assessments */}
+      {/* ── Checklist Split Layout ────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* 4. Display the Uploaded Image During Assessment */}
-        <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
-                Workplace Audit Evidence
-              </h4>
-              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                Audited State
-              </span>
-            </div>
-            <div className="relative group overflow-hidden rounded-lg border border-border bg-muted">
-              <img
-                src={workplaceImage.replace(/^__geo:[^_]*__/, "")}
-                alt="Audited Workspace"
-                className="w-full h-auto max-h-96 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
-              Verify questions below against this active visual record.
-            </p>
-          </div>
+        {/* Sticky image sidebar */}
+        <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 no-print">
+          <Card>
+            <CardHeader
+              badge={
+                <span className={`${ds.badge.base} ${ds.badge.primary} text-[9px]`}>
+                  Audited State
+                </span>
+              }
+            >
+              Workplace Audit Evidence
+            </CardHeader>
+            <CardBody className="space-y-3">
+              <div className="relative group overflow-hidden rounded-lg border border-border bg-muted">
+                <img
+                  src={workplaceImage.replace(/^__geo:[^_]*__/, "")}
+                  alt="Audited Workspace"
+                  className="w-full h-auto max-h-96 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+                />
+              </div>
+              <p className={`${ds.type.meta} italic text-center leading-relaxed`}>
+                Verify questions below against this active visual record.
+              </p>
+            </CardBody>
+          </Card>
         </div>
 
-        {/* Detailed Assessments */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between no-print">
-              <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
-                Detailed Pillar Checklist
-              </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold">
-                Click any row below to review observations
-              </span>
-            </div>
-            {pillars.map((pillar) => (
-              <PillarAssessment
-                key={pillar.name}
-                pillarKey={pillar.name as AuditPillar}
-                label={pillar.label}
-                jpName={pillar.jpName}
-                score={pillar.score}
-                maxScore={pillar.maxScore}
-                percentage={pillar.percentage}
-                rating={pillar.rating}
-                questions={pillar.questions}
-              />
-            ))}
-          </div>
+        {/* Detailed pillar checklist */}
+        <div className="lg:col-span-2 space-y-5">
+          <SectionHeader
+            title="Detailed Pillar Checklist"
+            subtitle="Click any row below to review observations"
+            className="no-print"
+          />
+          {pillars.map((pillar) => (
+            <PillarAssessment
+              key={pillar.name}
+              pillarKey={pillar.name as AuditPillar}
+              label={pillar.label}
+              jpName={pillar.jpName}
+              score={pillar.score}
+              maxScore={pillar.maxScore}
+              percentage={pillar.percentage}
+              rating={pillar.rating}
+              questions={pillar.questions}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Print-only layout for Workplace Image */}
+      {/* Print-only workplace image block */}
       <div className="hidden print:block space-y-3 my-8">
-        <h4 className="text-xs font-black uppercase tracking-wider text-foreground border-b border-border pb-1">
+        <h4 className={`${ds.type.cardTitle} border-b border-border pb-1`}>
           Workplace Image Audit Evidence
         </h4>
         <img
@@ -543,97 +614,123 @@ export default function AnalysisResults({
         />
       </div>
 
-      {/* Overall score section */}
-      <div className="print:break-inside-avoid">
+      {/* ── Overall Score ─────────────────────────────────────────────── */}
+      <Section>
         <AuditScoreCard
           score={overallScore}
           maxScore={overallMaxScore}
           percentage={overallPercentage}
           rating={overallRating}
         />
-      </div>
+      </Section>
 
-      {/* Radar Chart */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch print:break-inside-avoid">
-        <div className="md:col-span-1 flex flex-col justify-between space-y-4">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex-1 flex flex-col justify-center">
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground border-b border-border pb-2 mb-3">
-              Score Breakdown
-            </h4>
-            <div className="space-y-3 text-xs">
-              {pillars.map((p) => (
-                <div key={p.name} className="flex justify-between items-center">
-                  <span className="text-muted-foreground font-semibold">{p.label}</span>
-                  <span className="font-mono font-bold text-foreground">{p.score} / 16</span>
-                </div>
-              ))}
-            </div>
+      {/* ── Radar Chart + Score Breakdown ────────────────────────────── */}
+      <Section>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          <div className="md:col-span-1">
+            <Card className="h-full">
+              <CardHeader>Score Breakdown</CardHeader>
+              <CardBody className="space-y-3">
+                {pillars.map((p) => (
+                  <div key={p.name} className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground font-semibold">{p.label}</span>
+                    <span className="font-mono font-bold text-foreground">{p.score} / 16</span>
+                  </div>
+                ))}
+              </CardBody>
+            </Card>
+          </div>
+          <div className="md:col-span-2">
+            <RadarScoreChart pillars={pillars} />
           </div>
         </div>
-        <div className="md:col-span-2">
-          <RadarScoreChart pillars={pillars} />
-        </div>
-      </div>
+      </Section>
 
-      {/* Centralized Improvement Recommendations */}
-      <div className="space-y-3 print:break-inside-avoid">
-        <h3 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          Improvement Recommendations
-        </h3>
+      {/* ── Improvement Recommendations ───────────────────────────────── */}
+      <Section>
+        <SectionHeader
+          title="Improvement Recommendations"
+          icon={<Sparkles className="h-4 w-4 text-amber-500" />}
+        />
         <RecommendationCard recommendations={recommendations} />
-      </div>
+      </Section>
 
-      {/* Audit Timeline */}
+      {/* ── AI Workplace Transformation Preview ───────────────────────── */}
+      <Section>
+        <TransformationPreviewSection
+          auditId={areaInfo.areaName || 'current_audit'}
+          beforeImage={workplaceImage.replace(/^__geo:[^_]*__/, '')}
+          currentScore={overallScore}
+          maxScore={overallMaxScore}
+          currentPercentage={overallPercentage}
+          rating={overallRating}
+          context={{
+            areaName: areaInfo.areaName,
+            workspaceType: areaInfo.workspaceType,
+            industry: areaInfo.industry,
+            department: areaInfo.department,
+          }}
+          recommendations={recommendations.map((r) => ({
+            pillarName: r.pillarName,
+            problem: r.problem,
+            recommendation: r.recommendation,
+            priority: r.priority as 'high' | 'medium' | 'low',
+            expectedBenefit: r.expectedBenefit,
+            scoreGain: r.scoreGain,
+          }))}
+        />
+      </Section>
+
+      {/* ── Audit Timeline ────────────────────────────────────────────── */}
       {timeline && (
-        <div className="print:break-inside-avoid">
+        <Section>
           <AuditTimelineComponent timeline={timeline} />
-        </div>
+        </Section>
       )}
 
-      {/* PDF Download Button */}
-      <div className="flex gap-3 no-print">
-        <button
-          onClick={handleDownloadPDF}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shadow-primary/10 cursor-pointer"
-        >
+      {/* ── Download Button ───────────────────────────────────────────── */}
+      <div className="no-print">
+        <button onClick={handleDownloadPDF} className={ds.interactive.primaryButton}>
           <Download className="h-5 w-5" />
           Download PDF Report
         </button>
       </div>
 
-      {/* Developer Mode widgets */}
+      {/* ── Developer Mode ────────────────────────────────────────────── */}
       {devMode && (
-        <div className="bg-card border border-destructive/20 rounded-xl p-5 space-y-4 font-mono text-xs no-print">
-          <div className="flex items-center justify-between border-b border-border pb-2">
-            <h4 className="font-bold text-destructive flex items-center gap-1.5">
+        <Card className="border-destructive/20 no-print">
+          <CardHeader
+            badge={
+              <span className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded font-bold">
+                DEV ONLY
+              </span>
+            }
+          >
+            <span className="text-destructive flex items-center gap-1.5 font-mono">
               <Terminal className="h-4 w-4" />
               AI Developer Telemetry
-            </h4>
-            <span className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded font-bold">
-              DEV ONLY
             </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[10px] text-muted-foreground font-bold uppercase">Vision Model</p>
-              <p className="text-foreground mt-0.5 font-mono">{data.vision_model}</p>
+          </CardHeader>
+          <CardBody className="font-mono text-xs space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className={ds.type.label}>Vision Model</p>
+                <p className="text-foreground mt-0.5">{data.vision_model}</p>
+              </div>
+              <div>
+                <p className={ds.type.label}>Prompt Version</p>
+                <p className="text-foreground mt-0.5">v{data.prompt_version}</p>
+              </div>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground font-bold uppercase">Prompt Version</p>
-              <p className="text-foreground mt-0.5 font-mono">v{data.prompt_version}</p>
+              <p className={ds.type.label}>Raw JSON Payload</p>
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border mt-1">
+                {JSON.stringify(data, null, 2)}
+              </pre>
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Raw JSON Payload</p>
-            <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border">
-              {JSON.stringify(data, null, 2)}
-            </pre>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       )}
-    </div>
+    </AuditPage>
   );
 }

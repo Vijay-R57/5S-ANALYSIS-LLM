@@ -22,7 +22,6 @@ export default function PillarCard({
 }: Props) {
   const meta = PILLAR_META[pillarKey] || PILLAR_META.SORT;
 
-  // Custom colors for rating chips inside the card
   const getRatingStyle = (rat: string) => {
     const norm = rat.toLowerCase();
     if (norm.includes('very good') || norm.includes('excellent')) {
@@ -48,48 +47,46 @@ export default function PillarCard({
   return (
     <button
       onClick={handleScrollToDetail}
-      className="w-full text-left bg-card hover:bg-muted/30 border border-border hover:border-primary/40 rounded-xl p-4 transition-all duration-300 shadow-sm flex flex-col justify-between group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 no-print"
+      className="w-full h-full text-left bg-card hover:bg-muted/30 border border-border hover:border-primary/40 rounded-xl p-4 transition-all duration-300 shadow-sm flex flex-col gap-3 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 no-print"
     >
-      <div className="w-full space-y-3">
-        {/* Title and Icon */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl group-hover:scale-110 transition-transform duration-300">{meta.icon}</span>
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
-                {label}
-              </h4>
-              <p className="text-[10px] text-muted-foreground uppercase">
-                {jpName}
-              </p>
-            </div>
-          </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getRatingStyle(rating)}`}>
-            {rating.toUpperCase()}
-          </span>
-        </div>
-
-        {/* Score Ratio */}
-        <div className="flex items-baseline justify-between mt-2">
-          <span className="text-xs text-muted-foreground font-medium">Points</span>
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-lg font-extrabold text-foreground">{score}</span>
-            <span className="text-xs text-muted-foreground">/ {maxScore}</span>
+      {/* Title row */}
+      <div className="flex items-start justify-between gap-2 w-full">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xl shrink-0 group-hover:scale-110 transition-transform duration-300">{meta.icon}</span>
+          <div className="min-w-0">
+            <h4 className="text-xs font-black uppercase tracking-wider text-foreground leading-tight truncate">
+              {label}
+            </h4>
+            <p className="text-[10px] text-muted-foreground uppercase leading-tight">
+              {jpName}
+            </p>
           </div>
         </div>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${getRatingStyle(rating)}`}>
+          {rating.toUpperCase()}
+        </span>
+      </div>
 
-        {/* Progress Bar (Visual status indicator) */}
-        <div className="space-y-1.5 pt-1">
-          <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-            <span>Progress</span>
-            <span className="font-semibold">{percentage}%</span>
-          </div>
-          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${meta.color.replace('text-', 'bg-')}`}
-              style={{ width: `${percentage}%` }}
-            />
-          </div>
+      {/* Score row */}
+      <div className="flex items-baseline justify-between w-full">
+        <span className="text-xs text-muted-foreground font-medium">Points</span>
+        <div className="flex items-baseline gap-0.5">
+          <span className="text-lg font-extrabold text-foreground">{score}</span>
+          <span className="text-xs text-muted-foreground">/ {maxScore}</span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-full space-y-1">
+        <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+          <span>Progress</span>
+          <span className="font-semibold">{percentage}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${meta.color.replace('text-', 'bg-')}`}
+            style={{ width: `${percentage}%` }}
+          />
         </div>
       </div>
     </button>

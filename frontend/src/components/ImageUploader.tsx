@@ -9,10 +9,14 @@ export interface GeoMeta {
 
 interface ImageUploaderProps {
   label: string;
-  sublabel: string;
+  sublabel?: string;
   variant?: "workplace";
-  image: string | null;
-  onImageChange: (base64: string | null, geo?: GeoMeta | null) => void;
+  image?: string | null;
+  currentImage?: string | null;
+  onImageChange?: (base64: string | null, geo?: GeoMeta | null) => void;
+  onImageSelect?: (base64: string, geo: GeoMeta | null) => void;
+  onClear?: () => void;
+  accentColor?: string;
   timestamp?: string | null;
   employeeName?: string;
   officeName?: string;
@@ -47,15 +51,35 @@ const formatTimestamp = (iso: string) => {
 
 const ImageUploader = ({
   label,
-  sublabel,
+  sublabel = "JPG, PNG up to 10MB",
   variant = "workplace",
   image,
+  currentImage,
   onImageChange,
+  onImageSelect,
+  onClear,
+  accentColor = "emerald",
   employeeName = "Employee",
   officeName = "Office",
   zoneName = "Unspecified Zone",
   onGeoDenied,
 }: ImageUploaderProps) => {
+  const activeImage = image ?? currentImage ?? null;
+
+  const notifyImageChange = useCallback(
+    (base64: string | null, geo?: GeoMeta | null) => {
+      if (onImageChange) {
+        onImageChange(base64, geo ?? null);
+      }
+      if (onImageSelect && base64) {
+        onImageSelect(base64, geo ?? null);
+      }
+      if (!base64 && onClear) {
+        onClear();
+      }
+    },
+    [onImageChange, onImageSelect, onClear]
+  );
   const [isDragOver, setIsDragOver] = useState(false);
   const [geoStatus, setGeoStatus] = useState<"idle" | "fetching" | "granted" | "denied">("idle");
   const [geoMeta, setGeoMeta] = useState<GeoMeta | null>(null);
@@ -99,13 +123,13 @@ const ImageUploader = ({
       if (!file.type.startsWith("image/")) return;
       const reader = new FileReader();
       reader.onload = (e) => {
-        onImageChange(e.target?.result as string, null);
+        notifyImageChange(e.target?.result as string, null);
         setGeoMeta(null);
         setAddress(null);
       };
       reader.readAsDataURL(file);
     },
-    [onImageChange]
+    [notifyImageChange]
   );
 
   const handleDrop = useCallback(
@@ -227,13 +251,13 @@ const ImageUploader = ({
     const payload = `__geo:${lat},${lng}:${addr}__${base64}`;
     const finalMeta: GeoMeta = { latitude: lat, longitude: lng, capturedAt: now };
 
-    onImageChange(payload, finalMeta);
+    notifyImageChange(payload, finalMeta);
     setGeoMeta(finalMeta);
 
     stopStream();
     setCameraOpen(false);
     setCapturing(false);
-  }, [onImageChange, stopStream]);
+  }, [notifyImageChange, stopStream]);
 
   const closeCamera = useCallback(() => {
     stopStream();
@@ -255,7 +279,7 @@ const ImageUploader = ({
         const base64 = ev.target?.result as string;
         const capturedAt = new Date().toISOString();
         const meta: GeoMeta = { latitude: lat, longitude: lng, capturedAt };
-        onImageChange(`__geo:${lat},${lng}:${addr}__${base64}`, meta);
+        notifyImageChange(`__geo:${lat},${lng}:${addr}__${base64}`, meta);
         setGeoMeta(meta);
         setAddress(addr || null);
       };
@@ -267,7 +291,7 @@ const ImageUploader = ({
       // Allow re-selecting the same file
       e.target.value = "";
     },
-    [onImageChange]
+    [notifyImageChange]
   );
 
   // ─── Main button click ───────────────────────────────────────────────────
@@ -324,16 +348,49 @@ const ImageUploader = ({
   const accentBg = "bg-primary/5 border-primary/20";
 
   // Strip geo prefix for display
-  const displaySrc = image ? image.replace(/^__geo:[^_]*__/, "") : null;
+  const displaySrc = activeImage ? activeImage.replace(/^__geo:[^_]*__/, "") : null;
 
   return (
-    <div className="space-y-2">
-      {/* Label Row */}
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold ${tagBg}`}>
-          {label}
-        </span>
-        <span className="text-xs text-muted-foreground">{sublabel}</span>
+    <div className="space-y-3 h-full flex flex-col justify-start">
+      {/* Label & Header Action Row */}
+      <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2.5 min-h-[48px]">
+        <div className="space-y-0.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold truncate ${tagBg}`}>
+              {label}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground pl-0.5 truncate">{sublabel}</p>
+        </div>
+        {displaySrc && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <a
+              href={displaySrc}
+              download={`${label.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}-geotagged.jpg`}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-foreground bg-secondary hover:bg-secondary/80 border border-border px-2.5 py-1 rounded-md transition-colors"
+              title="Download watermarked image frame"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="h-3.5 w-3.5 text-primary" />
+              <span>Download</span>
+            </a>
+            <button
+              onClick={() => {
+                notifyImageChange(null, null);
+                setGeoMeta(null);
+                setAddress(null);
+                setGeoStatus("idle");
+                setCameraError(null);
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 px-2 py-1 rounded-md transition-colors cursor-pointer"
+              aria-label="Remove image"
+              title="Remove image"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Clear</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Full-screen Camera Modal ─────────────────────────────────────── */}
@@ -423,38 +480,16 @@ const ImageUploader = ({
 
       {/* ── Image Preview (after capture/upload) ────────────────────────── */}
       {displaySrc ? (
-        <div className="space-y-3">
-          <div className="relative rounded-xl overflow-hidden border border-border group">
-            <img
-              src={displaySrc}
-              alt={label}
-              className="w-full h-auto object-contain bg-black/5"
-            />
-            {/* Download button — bottom right, visible on hover */}
-            <a
-              href={displaySrc}
-              download={`${label.toLowerCase()}-geotagged.jpg`}
-              className="absolute bottom-3 right-3 p-2 rounded-lg bg-black/60 text-white hover:bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs font-medium z-10"
-              title="Download image with geotag"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Download className="h-4 w-4" />
-              Download
-            </a>
-            {/* Remove button — top right */}
-            <button
-              onClick={() => {
-                onImageChange(null, null);
-                setGeoMeta(null);
-                setAddress(null);
-                setGeoStatus("idle");
-                setCameraError(null);
-              }}
-              className="absolute top-3 right-3 p-1.5 rounded-full bg-foreground/70 text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Remove image"
-            >
-              <X className="h-4 w-4" />
-            </button>
+        <div className="space-y-3 flex-1 flex flex-col">
+          {/* 100% Blended Container — removes grey bars & blends seamlessly with watermark */}
+          <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-border/80 bg-[#1a1a1a] p-1 flex items-center justify-center shadow-xl shadow-black/20 group transition-all duration-300 hover:border-primary/50">
+            <div className="relative w-full h-full rounded-xl overflow-hidden bg-[#1a1a1a] flex items-center justify-center">
+              <img
+                src={displaySrc}
+                alt={label}
+                className="w-full h-full object-contain mx-auto rounded-lg transition-transform duration-300 group-hover:scale-[1.01]"
+              />
+            </div>
           </div>
 
           {/* ── Geo Tag Details Container ──────────────────────────────── */}

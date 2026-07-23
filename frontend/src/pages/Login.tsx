@@ -112,7 +112,7 @@ const Login = () => {
       await login(data.employee, data.session);
 
       if (data.employee?.office_id) {
-        navigate("/analysis");
+        navigate("/5s-audit");
       } else {
         navigate("/select-office");
       }

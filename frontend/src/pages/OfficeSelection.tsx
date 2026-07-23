@@ -71,7 +71,7 @@ const OfficeSelection = () => {
         short: office.name.split(" ")[0],
       });
 
-      navigate("/analysis");
+      navigate("/5s-audit");
     } catch (err: unknown) {
       console.error("Failed to persist office selection:", err);
       setError("Failed to save office selection. Please try again.");

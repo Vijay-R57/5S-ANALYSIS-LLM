@@ -9,6 +9,13 @@ import AuditExecutionPanel from "@/modules/audit/components/AuditExecutionPanel"
 import AuditProgressStepper from "@/modules/audit/components/AuditProgressStepper";
 import { AuditSessionState, SESSION_STATE_TO_STEP } from "@/modules/audit/types/sessionState";
 import { Loader2, Sparkles, User, BadgeCheck, Building2, AlertTriangle, RotateCcw, Camera } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { OFFICIAL_LOCATIONS } from "@/constants/facilities";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -141,7 +148,17 @@ const Analysis = () => {
   const { toast } = useToast();
   const { employee, office } = useAuth();
 
-  const officeName = office?.name ?? "Unknown Office";
+  const [selectedFacility, setSelectedFacility] = useState<string>(
+    office?.name || employee?.officeName || OFFICIAL_LOCATIONS[0]
+  );
+
+  useEffect(() => {
+    if (office?.name) {
+      setSelectedFacility(office.name);
+    }
+  }, [office?.name]);
+
+  const officeName = selectedFacility;
   const { pipeline, results, analysisTimestamp, runAnalysis, saveAuditLog, reset } = useAnalysisPipeline(officeName);
   const loading = pipeline.stage !== "idle" && pipeline.stage !== "complete" && pipeline.stage !== "error";
 
@@ -424,17 +441,33 @@ const Analysis = () => {
                       </div>
                     </div>
                   </div>
-                  {office && (
-                    <div className="flex items-start gap-3 sm:border-l sm:border-border sm:pl-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide font-bold">Selected Office</p>
-                        <p className="text-sm font-semibold text-foreground leading-snug">{office.name}</p>
-                      </div>
+                  <div className="flex items-start gap-3 sm:border-l sm:border-border sm:pl-4">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-primary" />
                     </div>
-                  )}
+                    <div className="space-y-1 min-w-0">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide font-bold">Selected Office</p>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="text-sm font-semibold text-primary hover:underline truncate flex items-center gap-1.5 bg-background px-2.5 py-1 rounded border border-border">
+                            <span className="truncate">{selectedFacility}</span>
+                            <span className="text-[10px] opacity-70">▼</span>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64 max-h-60 overflow-y-auto">
+                          {OFFICIAL_LOCATIONS.map((loc) => (
+                            <DropdownMenuItem
+                              key={loc}
+                              onClick={() => setSelectedFacility(loc)}
+                              className={selectedFacility === loc ? "font-semibold text-primary" : ""}
+                            >
+                              {loc}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

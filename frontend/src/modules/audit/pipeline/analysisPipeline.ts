@@ -52,10 +52,10 @@ import {
 // ── Model configuration ───────────────────────────────────────────────────────
 
 /** Primary Gemini model for all audit requests. Change here to update everywhere. */
-const GEMINI_MODEL = 'gemini-3.5-flash';
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.6-flash';
 
 /** Fallback model used on the single retry attempt. */
-const GEMINI_RETRY_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_RETRY_MODEL = 'gemini-3.5-flash-lite';
 
 // ── Internal types for parsed Gemini response ─────────────────────────────────
 

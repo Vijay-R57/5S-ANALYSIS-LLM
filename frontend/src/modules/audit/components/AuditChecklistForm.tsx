@@ -352,14 +352,6 @@ function AIAnswerCard({ response }: { response: AuditItemResponse }) {
           </span>
         )}
       </div>
-      {response.evidence && (
-        <div className="flex items-start gap-1.5">
-          <Eye className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-[11px] text-muted-foreground leading-relaxed italic">
-            "{response.evidence}"
-          </p>
-        </div>
-      )}
     </div>
   );
 }

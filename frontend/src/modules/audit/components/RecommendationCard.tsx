@@ -38,18 +38,12 @@ export default function RecommendationCard({ recommendations }: Props) {
     const element = document.getElementById(`question-${qId}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      
-      // Flash highlight effect
       element.classList.add('bg-primary/10', 'ring-2', 'ring-primary/40', 'rounded-lg');
       setTimeout(() => {
         element.classList.remove('bg-primary/10', 'ring-2', 'ring-primary/40');
       }, 3000);
-
-      // Programmatically trigger expand if collapsed
       const expandButton = element.querySelector('button[aria-label*="Expand"]') as HTMLButtonElement;
-      if (expandButton) {
-        expandButton.click();
-      }
+      if (expandButton) expandButton.click();
     }
   };
 
@@ -63,79 +57,80 @@ export default function RecommendationCard({ recommendations }: Props) {
   }
 
   return (
-    <div className="space-y-4 print:break-inside-avoid">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {recommendations.map((rec) => (
-          <div
-            key={rec.id}
-            className="bg-card border border-border hover:border-primary/30 rounded-xl p-5 shadow-sm transition-all duration-300 flex flex-col justify-between print:break-inside-avoid print:shadow-none"
-          >
-            <div className="space-y-4">
-              {/* Header: Priority & Pillar */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${getPriorityBadgeStyle(rec.priority)}`}>
-                  {getPriorityIcon(rec.priority)}
-                  {rec.priority.toUpperCase()} ACTION
-                </span>
-                <span className="text-[10px] font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded border border-border font-mono">
-                  PILLAR: {rec.pillarName.toUpperCase()}
-                </span>
-              </div>
-
-              {/* Problem Statement */}
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                  Identified Problem
-                </p>
-                <p className="text-sm font-bold text-foreground leading-snug">
-                  {rec.problem}
-                </p>
-              </div>
-
-              {/* Recommended Action */}
-              <div className="space-y-1 bg-primary/5 dark:bg-primary/10 border border-primary/10 rounded-lg p-3">
-                <p className="text-[10px] text-primary uppercase font-bold tracking-wider">
-                  Recommended Action
-                </p>
-                <p className="text-xs text-foreground font-medium leading-relaxed">
-                  {rec.recommendation}
-                </p>
-              </div>
-
-              {/* Expected Benefit */}
-              <div className="grid grid-cols-2 gap-4 text-xs pt-1">
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
-                    Expected Benefit
-                  </p>
-                  <p className="text-muted-foreground leading-snug">
-                    {rec.expectedBenefit}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
-                    Est. Score Gain
-                  </p>
-                  <p className="text-emerald-500 font-extrabold text-sm">
-                    +{rec.scoreGain} Point{rec.scoreGain !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 print:break-inside-avoid">
+      {recommendations.map((rec, idx) => (
+        <div
+          key={rec.id}
+          className="bg-card border border-border hover:border-primary/30 rounded-xl p-5 shadow-sm transition-all duration-300 flex flex-col gap-4 print:break-inside-avoid print:shadow-none"
+        >
+          {/* Rec number + priority + pillar */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-muted-foreground">
+                #{String(idx + 1).padStart(2, '0')}
+              </span>
+              <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${getPriorityBadgeStyle(rec.priority)}`}>
+                {getPriorityIcon(rec.priority)}
+                {rec.priority.toUpperCase()} ACTION
+              </span>
             </div>
+            <span className="text-[10px] font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded border border-border font-mono">
+              {rec.pillarName.toUpperCase()}
+            </span>
+          </div>
 
-            {/* Jump back link */}
-            <div className="mt-4 pt-3 border-t border-border/40 flex justify-end no-print">
-              <button
-                onClick={() => handleJumpToQuestion(rec.linkedQuestionId)}
-                className="inline-flex items-center gap-1 text-xs text-primary font-bold hover:text-primary/80 transition-colors cursor-pointer"
-              >
-                Jump to Question
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </button>
+          {/* Problem */}
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+              Identified Problem
+            </p>
+            <p className="text-sm font-bold text-foreground leading-snug">
+              {rec.problem}
+            </p>
+          </div>
+
+          {/* Recommended action */}
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/10 rounded-lg p-3.5 space-y-1.5">
+            <p className="text-[10px] text-primary uppercase font-bold tracking-wider">
+              Recommended Action
+            </p>
+            <p className="text-xs text-foreground font-medium leading-relaxed">
+              {rec.recommendation}
+            </p>
+          </div>
+
+          {/* Expected benefit + score gain */}
+          <div className="grid grid-cols-2 gap-4 text-xs pt-1">
+            <div className="space-y-0.5">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Expected Benefit
+              </p>
+              <p className="text-muted-foreground leading-snug">
+                {rec.expectedBenefit}
+              </p>
+            </div>
+            <div className="text-right space-y-0.5">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Est. Score Gain
+              </p>
+              <p className="text-emerald-500 font-extrabold text-sm">
+                +{rec.scoreGain} Point{rec.scoreGain !== 1 ? 's' : ''}
+              </p>
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* Jump link */}
+          <div className="pt-1 border-t border-border/40 flex justify-end no-print">
+            <button
+              onClick={() => handleJumpToQuestion(rec.linkedQuestionId)}
+              className="inline-flex items-center gap-1 text-xs text-primary font-bold hover:text-primary/80 transition-colors cursor-pointer"
+            >
+              Jump to Question
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Star, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { StarRating } from '@/design-system';
 
 interface Props {
   score: number;
@@ -53,9 +54,6 @@ export default function AuditScoreCard({ score, maxScore, percentage, rating }: 
 
   const currentCfg = colorMap[rating] || colorMap.Good;
 
-  // Star generation
-  const starsArray = Array.from({ length: 5 }, (_, i) => i < currentCfg.stars);
-
   return (
     <div className="space-y-4">
       {/* 9. Overall Audit Status Banner */}
@@ -77,18 +75,7 @@ export default function AuditScoreCard({ score, maxScore, percentage, rating }: 
             </h2>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          {starsArray.map((filled, idx) => (
-            <Star
-              key={idx}
-              className={`h-6 w-6 ${
-                filled
-                  ? 'fill-amber-400 text-amber-400'
-                  : 'text-muted/30 dark:text-muted/20'
-              }`}
-            />
-          ))}
-        </div>
+        <StarRating rating={rating} size="lg" />
       </div>
 
       {/* Numerical score details */}
