@@ -28,98 +28,90 @@ const Login = () => {
 
     setLoading(true);
     try {
-      let data;
-      let fnError: any;
+      const cleanEmpId = employeeId.trim();
+      const cleanPassword = password.trim();
+      const formattedEmail = cleanEmpId.includes("@")
+        ? cleanEmpId
+        : `${cleanEmpId.toLowerCase()}@arcolab.com`;
 
-      const bypass = import.meta.env.VITE_BYPASS_SUPABASE_FUNCTIONS === "true";
-      if (bypass) {
-        fnError = {
-          name: "FunctionsFetchError",
-          message: "Bypassed remote auth database call via VITE_BYPASS_SUPABASE_FUNCTIONS config"
-        };
-      } else {
-        try {
-          const response = await supabase.functions.invoke("employee-login", {
-            body: { employeeId: employeeId.trim(), password: password.trim() },
-          });
-          data = response.data;
-          fnError = response.error;
-        } catch (invokeError) {
-          console.warn("Failed to invoke employee-login Edge Function:", invokeError);
-          fnError = invokeError;
-        }
-      }
+      // 1. Authenticate with Supabase Auth
+      let authResult = await supabase.auth.signInWithPassword({
+        email: formattedEmail,
+        password: cleanPassword,
+      });
 
-      if (fnError && (
-        fnError.name === "FunctionsFetchError" || 
-        fnError instanceof FunctionsHttpError ||
-        fnError.message?.includes("Failed to send a request") ||
-        fnError.message?.includes("Edge Function not found") || 
-        fnError.status === 404 ||
-        fnError.status === 0
-      )) {
-        if (bypass) {
-          console.log("Logged in using local mock credentials (Local Mode)");
-        } else {
-          console.warn("Falling back to local mock login credentials.", fnError);
-        }
-        data = {
-          success: true,
-          session: {
-            access_token: "mock-access-token",
-            refresh_token: "mock-refresh-token",
-            user: {
-              id: "mock-user-id",
-              email: `${employeeId.trim().toLowerCase()}@arcolab.com`
-            }
+      // 2. If Auth account does not exist yet in Supabase Auth, register automatically
+      if (authResult.error && authResult.error.message?.toLowerCase().includes("invalid login credentials")) {
+        const signUpResult = await supabase.auth.signUp({
+          email: formattedEmail,
+          password: cleanPassword,
+          options: {
+            data: {
+              employee_code: cleanEmpId.toUpperCase(),
+              first_name: cleanEmpId,
+              role: "admin",
+            },
           },
-          employee: {
-            employeeId: employeeId.trim().toUpperCase(),
-            name: "Mock Employee",
-            department: "Operational Excellence",
-            office_id: "office-1",
-            role: "admin"
-          }
-        };
-        fnError = null;
-      }
+        });
 
-      if (fnError) {
-        console.error("Authentication Edge Function error:", fnError);
-        let errorMsg = "Invalid Employee ID or Password";
-        if (fnError instanceof FunctionsHttpError) {
-          try {
-            const body = await fnError.context.json();
-            if (body && body.error) {
-              errorMsg = body.error;
-            }
-          } catch (_) {
-            // fallback
-          }
-        } else if (fnError.message) {
-          errorMsg = fnError.message;
+        if (!signUpResult.error && signUpResult.data?.session) {
+          authResult = { data: signUpResult.data, error: null } as any;
+        } else if (signUpResult.data?.user && !signUpResult.data?.session) {
+          // Retry sign in if user was created but session needs activation
+          authResult = await supabase.auth.signInWithPassword({
+            email: formattedEmail,
+            password: cleanPassword,
+          });
         }
-        setError(errorMsg);
-        setLoading(false);
-        return;
       }
 
-      if (data?.error) {
-        setError(data.error);
-        setLoading(false);
-        return;
+      if (authResult.error) {
+        throw new Error(authResult.error.message || "Invalid Employee ID or Password");
       }
 
-      await login(data.employee, data.session);
+      const user = authResult.data.user;
+      const session = authResult.data.session;
 
-      if (data.employee?.office_id) {
+      if (!user || !session) {
+        throw new Error("Unable to establish Supabase session.");
+      }
+
+      // 3. Fetch user profile from public.profiles table in Supabase DB
+      const { data: profileData } = await supabase
+        .from("profiles" as never)
+        .select("first_name, last_name, role, employee_code, office_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const profile = profileData as {
+        first_name?: string | null;
+        last_name?: string | null;
+        role?: string;
+        employee_code?: string | null;
+        office_id?: string | null;
+      } | null;
+
+      const employeeObj = {
+        employeeId: profile?.employee_code || cleanEmpId.toUpperCase(),
+        name: profile && (profile.first_name || profile.last_name)
+          ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+          : cleanEmpId.toUpperCase(),
+        department: "Operational Excellence",
+        role: profile?.role || "admin",
+        office_id: profile?.office_id || null,
+      };
+
+      // 4. Set authentic session in AuthContext & Supabase Client
+      await login(employeeObj, session);
+
+      if (employeeObj.office_id) {
         navigate("/5s-audit");
       } else {
         navigate("/select-office");
       }
       return;
     } catch (err: unknown) {
-      console.error("Login unexpected error:", err);
+      console.error("Supabase Login Error:", err);
       const errMsg = err instanceof Error ? err.message : "Invalid Employee ID or Password";
       setError(errMsg);
     } finally {

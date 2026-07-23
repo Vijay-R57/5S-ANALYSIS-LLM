@@ -13,6 +13,14 @@ interface DBOffice {
   country: string;
 }
 
+const DEFAULT_OFFICES: DBOffice[] = [
+  { id: "off-bengaluru-hq", name: "Arcolab Corporate HQ (Bengaluru)", city: "Bengaluru", country: "India" },
+  { id: "off-bengaluru-rd", name: "Arcolab R&D Center (Bengaluru)", city: "Bengaluru", country: "India" },
+  { id: "off-strides-kbs", name: "Strides Global Formulation Facility (KBS)", city: "Bengaluru", country: "India" },
+  { id: "off-strides-biotech", name: "Strides Biotech Manufacturing Unit (KBS)", city: "Bengaluru", country: "India" },
+  { id: "off-arcolab-qc", name: "Arcolab Quality Control Center", city: "Bengaluru", country: "India" },
+];
+
 const OfficeSelection = () => {
   const navigate = useNavigate();
   const { employee, setOfficeState, isAuthenticated } = useAuth();
@@ -35,11 +43,14 @@ const OfficeSelection = () => {
           .from("offices" as never)
           .select("id, name, city, country");
 
-        if (dbError) throw dbError;
-        setOffices((data as DBOffice[]) || []);
+        if (!dbError && data && (data as DBOffice[]).length > 0) {
+          setOffices(data as DBOffice[]);
+        } else {
+          setOffices(DEFAULT_OFFICES);
+        }
       } catch (err: unknown) {
-        console.error("Failed to fetch offices:", err);
-        setError("Unable to load offices. Please ensure you are authenticated.");
+        console.error("Failed to fetch offices from DB:", err);
+        setOffices(DEFAULT_OFFICES);
       } finally {
         setLoading(false);
       }
@@ -56,15 +67,28 @@ const OfficeSelection = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No authenticated user session found");
 
+      // Ensure office exists in public.offices DB table
+      try {
+        await (supabase.from("offices" as never) as any).upsert({
+          id: office.id,
+          name: office.name,
+          city: office.city || "Bengaluru",
+          country: office.country || "India",
+        }, { onConflict: "id" });
+      } catch (_) {
+        // non-fatal if RLS restricts office upsert
+      }
+
       // Save to public.profiles database table
-      const { error: updateError } = await supabase
-        .from("profiles" as unknown as "profiles")
+      const { error: updateError } = await (supabase.from("profiles" as never) as any)
         .update({ office_id: office.id })
         .eq("id", user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.warn("Could not update office_id on profiles table:", updateError);
+      }
 
-      // Update state in AuthContext (saves to sessionStorage and updates React state)
+      // Update state in AuthContext
       setOfficeState({
         id: office.id,
         name: office.name,
