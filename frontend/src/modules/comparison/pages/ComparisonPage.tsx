@@ -18,6 +18,7 @@ import ImageUploader, { GeoMeta } from "@/modules/comparison/components/ImageUpl
 import AnalysisResults from "@/modules/comparison/components/AnalysisResults";
 import AnalysisProgress from "@/modules/comparison/components/AnalysisProgress";
 import { Loader2, Sparkles, User, BadgeCheck, Building2, MapPin, AlertTriangle, RotateCcw, ChevronDown } from "lucide-react";
+import OfficeDropdown from "@/components/ui/OfficeDropdown";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -331,7 +332,7 @@ const ComparisonPage = () => {
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">SELECTED OFFICE</p>
-                    <p className="text-base font-semibold text-foreground leading-snug">{office?.name ?? "Bengaluru Corporate Office"}</p>
+                    <OfficeDropdown />
                   </div>
                 </div>
               </div>

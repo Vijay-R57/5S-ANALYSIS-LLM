@@ -15,9 +15,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAnalysisPipeline } from "@/hooks/useAnalysisPipeline";
 import arcolabLogoSrc from "@/assets/arcolab-logo.png";
 import type { ImageValidationResult, AuditTimeline, AuditAnalysisResult } from "@/types/analysis";
-import AdditionalAuditInfoPanel from "@/modules/audit/components/AdditionalAuditInfoPanel";
 import { recalculateSessionScore, type AiRating } from "@/modules/audit/pipeline/scoreUtils";
 import { getAllQuestions } from "@/modules/audit/pipeline/questions";
+import OfficeDropdown from "@/components/ui/OfficeDropdown";
 
 // Loads Arcolab logo as an Image element (cached after first load)
 let cachedLogo: HTMLImageElement | null = null;
@@ -424,17 +424,15 @@ const Analysis = () => {
                       </div>
                     </div>
                   </div>
-                  {office && (
-                    <div className="flex items-start gap-3 sm:border-l sm:border-border sm:pl-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide font-bold">Selected Office</p>
-                        <p className="text-sm font-semibold text-foreground leading-snug">{office.name}</p>
-                      </div>
+                  <div className="flex items-start gap-3 sm:border-l sm:border-border sm:pl-4">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-primary" />
                     </div>
-                  )}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide font-bold">Selected Office</p>
+                      <OfficeDropdown />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
