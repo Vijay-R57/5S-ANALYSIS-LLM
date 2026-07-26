@@ -1,5 +1,6 @@
 import React from 'react';
-import { Star, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import AuditStarRating from '@/components/ui/AuditStarRating';
 
 interface Props {
   score: number;
@@ -12,49 +13,41 @@ export default function AuditScoreCard({ score, maxScore, percentage, rating }: 
   // Map rating to color schemes (Industrial HSL tailored colors)
   const colorMap: Record<
     typeof rating,
-    { text: string; bg: string; border: string; stars: number; desc: string }
+    { text: string; bg: string; border: string; desc: string }
   > = {
     Excellent: {
       text: 'text-emerald-600 dark:text-emerald-400',
       bg: 'bg-emerald-500/10 dark:bg-emerald-500/5',
       border: 'border-emerald-500/30 dark:border-emerald-500/20',
-      stars: 5,
       desc: 'Outstanding performance. Area exceeds industrial standard compliance.',
     },
     Good: {
       text: 'text-blue-600 dark:text-blue-400',
       bg: 'bg-blue-500/10 dark:bg-blue-500/5',
       border: 'border-blue-500/30 dark:border-blue-500/20',
-      stars: 4,
       desc: 'Solid execution. Minor adjustments needed to reach benchmark levels.',
     },
     Average: {
       text: 'text-amber-600 dark:text-amber-400',
       bg: 'bg-amber-500/10 dark:bg-amber-500/5',
       border: 'border-amber-500/30 dark:border-amber-500/20',
-      stars: 3,
       desc: 'Acceptable but improvable. Moderate clutter or order violations detected.',
     },
     'Needs Improvement': {
       text: 'text-orange-600 dark:text-orange-400',
       bg: 'bg-orange-500/10 dark:bg-orange-500/5',
       border: 'border-orange-500/30 dark:border-orange-500/20',
-      stars: 2,
       desc: 'Action required. Critical gaps in cleaning and standardization.',
     },
     Poor: {
       text: 'text-red-600 dark:text-red-400',
       bg: 'bg-red-500/10 dark:bg-red-500/5',
       border: 'border-red-500/30 dark:border-red-500/20',
-      stars: 1,
       desc: 'Immediate remediation required. High safety and compliance risk.',
     },
   };
 
   const currentCfg = colorMap[rating] || colorMap.Good;
-
-  // Star generation
-  const starsArray = Array.from({ length: 5 }, (_, i) => i < currentCfg.stars);
 
   return (
     <div className="space-y-4">
@@ -77,18 +70,7 @@ export default function AuditScoreCard({ score, maxScore, percentage, rating }: 
             </h2>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          {starsArray.map((filled, idx) => (
-            <Star
-              key={idx}
-              className={`h-6 w-6 ${
-                filled
-                  ? 'fill-amber-400 text-amber-400'
-                  : 'text-muted/30 dark:text-muted/20'
-              }`}
-            />
-          ))}
-        </div>
+        <AuditStarRating status={rating} />
       </div>
 
       {/* Numerical score details */}

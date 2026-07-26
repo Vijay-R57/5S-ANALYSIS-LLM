@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import OfficeSelection from "./pages/OfficeSelection";
 import History from "./pages/History";
 import AuditPage from "./modules/audit/pages/AuditPage";
+import Comparison from "./pages/Comparison";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,8 @@ const App = () => (
             <Route path="/select-office" element={<OfficeSelection />} />
             <Route path="/login" element={<Login />} />
             <Route path="/analysis" element={<ProtectedRoute><Analysis /></ProtectedRoute>} />
+            <Route path="/5s-audit" element={<ProtectedRoute><Analysis /></ProtectedRoute>} />
+            <Route path="/5s-comparison" element={<ProtectedRoute><Comparison /></ProtectedRoute>} />
             <Route path="/about" element={<About />} />
             <Route path="/lean-maintenance" element={<LeanMaintenance />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

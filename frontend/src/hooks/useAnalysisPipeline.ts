@@ -161,31 +161,51 @@ export function useAnalysisPipeline(officeName: string) {
     async (finalResult: AuditAnalysisResult, beforeImage: string) => {
       setStage('saving', 97, 'Saving audit record…');
       const bypass = import.meta.env.VITE_BYPASS_SUPABASE_FUNCTIONS === 'true';
-      if (employee && !bypass) {
-        try {
-          const { error: logErr } = await supabase.functions.invoke('save-analysis-log', {
-            body: {
-              employeeId:     employee.employeeId,
-              employeeName:   employee.name,
-              department:     employee.department,
-              officeName,
-              beforeImage,
-              analysisResult: finalResult,
-              scoringMethod:  'AI Audit V2 (Rating-Based)',
-              capturedAt:     new Date().toISOString(),
-            },
-          });
-          if (logErr) throw logErr;
-        } catch (e: any) {
-          console.error('[useAnalysisPipeline] Log save error:', e);
-          toast({
-            title:       'Error Saving Log',
-            description: e.message || 'Failed to save audit record',
-            variant:     'destructive',
-          });
+      if (employee) {
+        const savePayload = {
+          employee_id:     employee.employeeId || 'UNKNOWN',
+          employee_name:   employee.name || 'Employee',
+          department:     employee.department || 'Operational Excellence',
+          office_name:     officeName ?? null,
+          before_image:    null,
+          after_image:     null,
+          analysis_result: finalResult,
+          scoring_method:  'AI Audit V2 (Rating-Based)',
+          captured_at:     new Date().toISOString(),
+          upload_status:   'uploaded',
+        };
+
+        if (!bypass) {
+          try {
+            const { error: logErr } = await supabase.functions.invoke('save-analysis-log', {
+              body: {
+                employeeId:     employee.employeeId,
+                employeeName:   employee.name,
+                department:     employee.department,
+                officeName,
+                beforeImage,
+                analysisResult: finalResult,
+                scoringMethod:  'AI Audit V2 (Rating-Based)',
+                capturedAt:     new Date().toISOString(),
+              },
+            });
+            if (logErr) throw logErr;
+          } catch (e: any) {
+            console.warn('[useAnalysisPipeline] Edge function log save issue, performing direct DB log insert...', e);
+            try {
+              await (supabase as any).from('analysis_logs').insert(savePayload);
+            } catch (dbErr) {
+              console.error('[useAnalysisPipeline] Direct DB log save error:', dbErr);
+            }
+          }
+        } else {
+          try {
+            console.log('[useAnalysisPipeline] Direct DB log insert (Local/Bypass Mode)');
+            await (supabase as any).from('analysis_logs').insert(savePayload);
+          } catch (dbErr) {
+            console.error('[useAnalysisPipeline] Direct DB log save error:', dbErr);
+          }
         }
-      } else if (employee && bypass) {
-        console.log('[useAnalysisPipeline] Bypassed remote log saving (Local Mode)');
       }
       setStage('complete', 100, 'Analysis complete');
     },

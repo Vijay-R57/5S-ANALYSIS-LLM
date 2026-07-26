@@ -261,6 +261,7 @@ const History = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [moduleFilter, setModuleFilter] = useState<"all" | "audit" | "comparison">("all");
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
@@ -279,6 +280,13 @@ const History = () => {
         // Workers see only their own records — filter by their employee ID
         if (!isAdmin && employee?.employeeId) {
           query = query.eq("employee_id", employee.employeeId);
+        }
+
+        // ── Module filtering ─────────────────────────────────────────────────
+        if (moduleFilter === "comparison") {
+          query = query.ilike("scoring_method", "%Gemini Vision%");
+        } else if (moduleFilter === "audit") {
+          query = query.not("scoring_method", "ilike", "%Gemini Vision%");
         }
 
         // ── Search filter ────────────────────────────────────────────────────
@@ -316,7 +324,7 @@ const History = () => {
     }, 300);
 
     return () => clearTimeout(handler);
-  }, [search, dateFilter, retryKey, isAdmin, employee?.employeeId]);
+  }, [search, dateFilter, moduleFilter, retryKey, isAdmin, employee?.employeeId]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -347,6 +355,40 @@ const History = () => {
                   <p className="text-xs text-muted-foreground">{employee.name}</p>
                 )}
               </div>
+            </div>
+
+            {/* Module Filter Tabs */}
+            <div className="flex items-center gap-2 mb-6 p-1 bg-muted/40 rounded-xl border border-border w-fit">
+              <button
+                onClick={() => setModuleFilter("all")}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  moduleFilter === "all"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                All Modules
+              </button>
+              <button
+                onClick={() => setModuleFilter("audit")}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  moduleFilter === "audit"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                5S Audit
+              </button>
+              <button
+                onClick={() => setModuleFilter("comparison")}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  moduleFilter === "comparison"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                5S Comparison
+              </button>
             </div>
 
             {/* Role info banner */}

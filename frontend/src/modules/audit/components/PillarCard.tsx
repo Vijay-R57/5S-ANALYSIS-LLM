@@ -48,23 +48,23 @@ export default function PillarCard({
   return (
     <button
       onClick={handleScrollToDetail}
-      className="w-full text-left bg-card hover:bg-muted/30 border border-border hover:border-primary/40 rounded-xl p-4 transition-all duration-300 shadow-sm flex flex-col justify-between group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 no-print"
+      className="w-full h-full text-left bg-card hover:bg-muted/30 border border-border hover:border-primary/40 rounded-xl p-4 transition-all duration-300 shadow-sm flex flex-col justify-between group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 no-print"
     >
-      <div className="w-full space-y-3">
+      <div className="w-full space-y-3 flex flex-col justify-between h-full">
         {/* Title and Icon */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl group-hover:scale-110 transition-transform duration-300">{meta.icon}</span>
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
+        <div className="flex items-start justify-between gap-1.5 min-w-0">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <span className="text-xl shrink-0 group-hover:scale-110 transition-transform duration-300">{meta.icon}</span>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-black uppercase tracking-wider text-foreground truncate" title={label}>
                 {label}
               </h4>
-              <p className="text-[10px] text-muted-foreground uppercase">
+              <p className="text-[10px] text-muted-foreground uppercase truncate">
                 {jpName}
               </p>
             </div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getRatingStyle(rating)}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${getRatingStyle(rating)}`}>
             {rating.toUpperCase()}
           </span>
         </div>

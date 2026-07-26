@@ -133,36 +133,25 @@ export default function PillarAssessment({
 
               {/* 5. Collapsible details section */}
               {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs animate-fade-in print:grid">
-                  {/* Evidence Card */}
-                  <div className="bg-muted/20 border border-border/40 rounded-lg p-3 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-muted-foreground uppercase tracking-wider font-bold text-[9px]">
-                      <Eye className="h-3.5 w-3.5 text-primary" />
-                      <span>Evidence</span>
-                    </div>
-                    <p className="text-foreground leading-relaxed italic">
-                      "{q.evidence}"
-                    </p>
-                  </div>
-
+                <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs animate-fade-in print:grid">
                   {/* Reason Card */}
-                  <div className="bg-muted/20 border border-border/40 rounded-lg p-3 space-y-1.5">
+                  <div className="bg-muted/20 border border-border/40 rounded-lg p-3 flex flex-col justify-between h-full space-y-1.5">
                     <div className="flex items-center gap-1.5 text-muted-foreground uppercase tracking-wider font-bold text-[9px]">
-                      <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                       <span>Reason</span>
                     </div>
-                    <p className="text-foreground leading-relaxed">
+                    <p className="text-foreground leading-relaxed mt-1 flex-1">
                       {q.reason}
                     </p>
                   </div>
 
                   {/* Supporting Observation Card */}
-                  <div className="bg-muted/20 border border-border/40 rounded-lg p-3 space-y-1.5">
+                  <div className="bg-muted/20 border border-border/40 rounded-lg p-3 flex flex-col justify-between h-full space-y-1.5">
                     <div className="flex items-center gap-1.5 text-muted-foreground uppercase tracking-wider font-bold text-[9px]">
-                      <Info className="h-3.5 w-3.5 text-blue-500" />
+                      <Info className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                       <span>Supporting Observation (Benchmark)</span>
                     </div>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p className="text-muted-foreground leading-relaxed mt-1 flex-1">
                       {q.benchmark}
                     </p>
                   </div>

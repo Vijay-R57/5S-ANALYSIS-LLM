@@ -121,7 +121,7 @@ export default function AuditSessionSummary({ session, summary: legacySummary }:
       </div>
 
       {/* 3. Interactive Pillar Navigation */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print items-stretch">
         {pillars.map((pillar) => (
           <PillarCard
             key={pillar.name}
@@ -136,45 +136,46 @@ export default function AuditSessionSummary({ session, summary: legacySummary }:
         ))}
       </div>
 
-      {/* Split layout: Sticky Image Preview + Detailed Assessments */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* 4. Display the Uploaded Image During Assessment */}
-        {primaryImage && (
-          <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
-            <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
-                  Workplace Audit Evidence
-                </h4>
-                <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                  Audited State
-                </span>
-              </div>
-              <div className="relative overflow-hidden rounded-lg border border-border bg-muted">
-                <img
-                  src={primaryImage}
-                  alt="Audited Workspace"
-                  className="w-full h-auto max-h-96 object-contain rounded-lg"
-                />
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
-                Verify questions below against this active visual record.
-              </p>
-            </div>
-          </div>
-        )}
+      {/* 4. Split layout: Aligned Sticky Evidence Preview + Detailed Assessments */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between no-print border-b border-border/60 pb-2">
+          <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
+            Detailed Pillar Checklist & Evidence
+          </h3>
+          <span className="text-[10px] text-muted-foreground font-semibold">
+            Click any row below to review observations
+          </span>
+        </div>
 
-        {/* Detailed Assessments */}
-        <div className={primaryImage ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between no-print">
-              <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
-                Detailed Pillar Checklist
-              </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold">
-                Click any row below to review observations
-              </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Display the Uploaded Image During Assessment */}
+          {primaryImage && (
+            <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
+                    Workplace Audit Evidence
+                  </h4>
+                  <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Audited State
+                  </span>
+                </div>
+                <div className="relative group overflow-hidden rounded-lg border border-border bg-muted flex items-center justify-center p-1 min-h-[200px]">
+                  <img
+                    src={primaryImage}
+                    alt="Audited Workspace"
+                    className="w-full h-auto max-h-96 object-contain rounded-lg"
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
+                  Verify questions below against this active visual record.
+                </p>
+              </div>
             </div>
+          )}
+
+          {/* Detailed Assessments */}
+          <div className={primaryImage ? 'lg:col-span-2 space-y-6' : 'lg:col-span-3 space-y-6'}>
             {pillars.map((pillar) => (
               <PillarAssessment
                 key={pillar.name}

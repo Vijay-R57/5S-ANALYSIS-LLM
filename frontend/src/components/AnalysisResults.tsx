@@ -6,7 +6,7 @@
  * Single workplace image workflow; displays executive summary and audit timeline.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Download, ShieldCheck, Printer, Terminal, Eye, Sparkles } from 'lucide-react';
 import { mapAnalysisResultToAuditResult } from '@/modules/audit/utils/auditMapper';
 import AuditProgressStepper from '@/modules/audit/components/AuditProgressStepper';
@@ -18,8 +18,11 @@ import RecommendationCard from '@/modules/audit/components/RecommendationCard';
 import RadarScoreChart from '@/modules/audit/components/RadarScoreChart';
 import AuditSummaryCard from '@/modules/audit/components/AuditSummaryCard';
 import AuditTimelineComponent from '@/modules/audit/components/AuditTimeline';
+import ImprovementPreviewCard from '@/modules/audit/components/ImprovementPreviewCard';
 import type { AuditAnalysisResult, AuditTimeline } from '@/types/analysis';
 import { jsPDF } from 'jspdf';
+import { generateImprovementVisualization } from '@/services/visualization/iveService';
+import type { ImprovementVisualizationResult } from '@/services/visualization/types';
 
 interface Props {
   data: AuditAnalysisResult;
@@ -48,6 +51,8 @@ export default function AnalysisResults({
   }
 
   const [devMode, setDevMode] = useState(false);
+  const [iveResult, setIveResult] = useState<ImprovementVisualizationResult | null>(null);
+  const iveCalledRef = useRef(false);
 
   // Map incoming database AI response model to future-compatible AuditResult contract
   const auditResult = mapAnalysisResultToAuditResult(data, analysisTimestamp);
@@ -60,6 +65,29 @@ export default function AnalysisResults({
     imageQualityLevel,
   };
 
+  // Phase 7 – Improvement Visualization Engine (IVE)
+  // Invoked ONCE after audit data is available. Never modifies audit results.
+  useEffect(() => {
+    if (iveCalledRef.current) return;
+    iveCalledRef.current = true;
+
+    const cleanImage = workplaceImage.replace(/^__geo:[^_]*__/, '');
+
+    generateImprovementVisualization({
+      cacheKey: `${areaInfo.areaName}-${areaInfo.auditDate}`.replace(/\s+/g, '-'),
+      originalImageUrl: cleanImage,
+      recommendations,
+      zoneName: areaInfo.areaName,
+      workspaceType: areaInfo.workspaceType,
+      industry: areaInfo.industry,
+    })
+      .then(setIveResult)
+      .catch((err) => {
+        // Visualization failures never interrupt the audit report
+        console.error('[IVE] Gracefully caught error:', err);
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDownloadPDF = () => {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -67,29 +95,31 @@ export default function AnalysisResults({
       format: 'a4'
     });
 
-    let y = 15;
     const margin = 15;
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width; // 210mm
+    const pageHeight = doc.internal.pageSize.height; // 297mm
+    const contentWidth = pageWidth - (margin * 2); // 180mm
+
+    let y = margin;
 
     const checkPageBreak = (needed: number) => {
-      if (y + needed > pageHeight - 15) {
+      if (y + needed > pageHeight - 18) {
         doc.addPage();
-        y = 15;
+        y = 20;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text('ARCOLAB 5S Workplace Audit Report', margin, 10);
-        doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin - 10, 10);
+        doc.setTextColor(140, 140, 140);
+        doc.text('ARCOLAB 5S Workplace Audit Report', margin, 12);
+        doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, 12, { align: 'right' });
         doc.setLineWidth(0.2);
-        doc.setDrawColor(230, 230, 230);
-        doc.line(margin, 12, pageWidth - margin, 12);
+        doc.setDrawColor(220, 220, 220);
+        doc.line(margin, 14, pageWidth - margin, 14);
       }
     };
 
-    // Header Panel
+    // Header Panel Box
     doc.setFillColor(26, 80, 54);
-    doc.rect(margin, y, pageWidth - (margin * 2), 20, 'F');
+    doc.rect(margin, y, contentWidth, 20, 'F');
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
@@ -113,32 +143,48 @@ export default function AnalysisResults({
     y += 6;
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8.5);
+    doc.setTextColor(70, 70, 70);
 
+    const colWidth = (contentWidth - 10) / 2;
     const leftColX = margin;
-    const rightColX = pageWidth / 2 + 5;
+    const rightColX = margin + colWidth + 10;
 
-    // Left Column
-    doc.text(`Company: ${areaInfo.companyName}`, leftColX, y); y += 5;
-    doc.text(`Auditor: ${areaInfo.auditor}`, leftColX, y); y += 5;
-    doc.text(`Department: ${areaInfo.department}`, leftColX, y); y += 5;
-    doc.text(`Workspace Type: ${areaInfo.workspaceType}`, leftColX, y); y += 5;
+    const leftFields = [
+      `Company: ${areaInfo.companyName}`,
+      `Auditor: ${areaInfo.auditor}`,
+      `Department: ${areaInfo.department}`,
+      `Workspace Type: ${areaInfo.workspaceType}`,
+    ];
 
-    // Reset y for right column
-    let yRight = y - 20;
-    doc.text(`Date Conducted: ${areaInfo.auditDate}`, rightColX, yRight); yRight += 5;
-    doc.text(`Area / Station: ${areaInfo.areaName}`, rightColX, yRight); yRight += 5;
-    doc.text(`Industry: ${areaInfo.industry}`, rightColX, yRight); yRight += 5;
-    doc.text(`Scoring Standard: Physical Audit 5S (0-4 Rating)`, rightColX, yRight);
+    const rightFields = [
+      `Date Conducted: ${areaInfo.auditDate}`,
+      `Area / Station: ${areaInfo.areaName}`,
+      `Industry: ${areaInfo.industry}`,
+      `Scoring Standard: Physical Audit 5S (0-4 Rating)`,
+    ];
 
-    y += 6;
+    let yLeft = y;
+    leftFields.forEach(f => {
+      const lines = doc.splitTextToSize(f, colWidth);
+      doc.text(lines, leftColX, yLeft);
+      yLeft += (lines.length * 4.5);
+    });
 
-    // Summary Card (Border box)
+    let yRight = y;
+    rightFields.forEach(f => {
+      const lines = doc.splitTextToSize(f, colWidth);
+      doc.text(lines, rightColX, yRight);
+      yRight += (lines.length * 4.5);
+    });
+
+    y = Math.max(yLeft, yRight) + 6;
+
+    // Summary Card Box
     checkPageBreak(40);
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
-    doc.rect(margin, y, pageWidth - (margin * 2), 32, 'FD');
+    doc.rect(margin, y, contentWidth, 34, 'FD');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -151,17 +197,17 @@ export default function AnalysisResults({
     doc.text(`Overall Score: ${overallScore} / ${overallMaxScore} (${overallPercentage}%)`, margin + 5, y + 14);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(8.5);
+    doc.setTextColor(80, 80, 80);
     doc.text(`Rating: ${overallRating.toUpperCase()}`, margin + 5, y + 21);
     doc.text(`Critical Findings: ${enhancedSummary.criticalFindings}`, margin + 5, y + 27);
 
-    const sumRightX = pageWidth / 2 + 10;
+    const sumRightX = margin + contentWidth / 2 + 5;
     doc.text(`Highest Pillar: ${enhancedSummary.highestPillar}`, sumRightX, y + 14);
     doc.text(`Lowest Pillar: ${enhancedSummary.lowestPillar}`, sumRightX, y + 20);
     doc.text(`Image Quality: ${enhancedSummary.imageQualityScore !== null ? `${enhancedSummary.imageQualityScore}/100 (${enhancedSummary.imageQualityLevel})` : 'N/A'}`, sumRightX, y + 26);
 
-    y += 38;
+    y += 40;
 
     // Pillar Scores
     checkPageBreak(45);
@@ -170,16 +216,18 @@ export default function AnalysisResults({
     doc.setTextColor(50, 50, 50);
     doc.text('5S PILLAR SCORE BREAKDOWN', margin, y);
     y += 4;
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(200, 200, 200);
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(100, 100, 100);
     doc.text('Pillar', margin + 5, y);
-    doc.text('Score', margin + 60, y);
-    doc.text('Compliance', margin + 90, y);
-    doc.text('Rating', margin + 130, y);
+    doc.text('Score', margin + 65, y);
+    doc.text('Compliance', margin + 105, y);
+    doc.text('Rating', margin + 145, y);
     y += 5;
 
     doc.setLineWidth(0.1);
@@ -187,11 +235,13 @@ export default function AnalysisResults({
     y += 5;
 
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
     pillars.forEach((p) => {
       doc.text(p.label, margin + 5, y);
-      doc.text(`${p.score} / ${p.maxScore}`, margin + 60, y);
-      doc.text(`${p.percentage}%`, margin + 90, y);
-      doc.text(p.rating, margin + 130, y);
+      doc.text(`${p.score} / ${p.maxScore}`, margin + 65, y);
+      doc.text(`${p.percentage}%`, margin + 105, y);
+      doc.text(p.rating, margin + 145, y);
       y += 6;
     });
 
@@ -205,6 +255,7 @@ export default function AnalysisResults({
     doc.text('STRENGTHS & AREAS OF CONCERN', margin, y);
     y += 4;
     doc.setLineWidth(0.3);
+    doc.setDrawColor(200, 200, 200);
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
 
@@ -212,62 +263,83 @@ export default function AnalysisResults({
     doc.setFontSize(9);
     doc.setTextColor(22, 101, 52);
     doc.text('Overall Strengths:', margin, y);
-    y += 4.5;
+    y += 5;
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(70, 70, 70);
     enhancedSummary.strengths.forEach((str) => {
-      doc.text(`• ${str}`, margin + 3, y);
-      y += 4.5;
+      const strLines = doc.splitTextToSize(`• ${str}`, contentWidth - 10);
+      checkPageBreak(strLines.length * 4.5);
+      doc.text(strLines, margin + 3, y);
+      y += (strLines.length * 4.5);
     });
 
-    y += 2;
+    y += 3;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(180, 83, 9);
     doc.text('Areas of Concern / Weaknesses:', margin, y);
-    y += 4.5;
+    y += 5;
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(70, 70, 70);
     enhancedSummary.weaknesses.forEach((weak) => {
-      doc.text(`• ${weak}`, margin + 3, y);
-      y += 4.5;
+      const weakLines = doc.splitTextToSize(`• ${weak}`, contentWidth - 10);
+      checkPageBreak(weakLines.length * 4.5);
+      doc.text(weakLines, margin + 3, y);
+      y += (weakLines.length * 4.5);
     });
 
-    y += 6;
+    y += 8;
 
     // Recommendations
     if (recommendations && recommendations.length > 0) {
-      checkPageBreak(40);
+      checkPageBreak(30);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(50, 50, 50);
       doc.text('CORRECTIVE ACTION RECOMMENDATIONS', margin, y);
       y += 4;
       doc.setLineWidth(0.3);
+      doc.setDrawColor(200, 200, 200);
       doc.line(margin, y, pageWidth - margin, y);
       y += 6;
 
       recommendations.forEach((rec, idx) => {
-        checkPageBreak(25);
+        const titleText = `${idx + 1}. [${rec.priority.toUpperCase()} ACTION] ${rec.problem}`;
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(50, 50, 50);
-        doc.text(`${idx + 1}. [${rec.priority.toUpperCase()} ACTION] ${rec.problem}`, margin, y);
-        y += 4.5;
+        doc.setFontSize(8.5);
+        const titleLines = doc.splitTextToSize(titleText, contentWidth - 10);
+
+        const recTextStr = `Recommendation: ${rec.recommendation}`;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        const recLines = doc.splitTextToSize(recTextStr, contentWidth - 12);
+
+        const benefitTextStr = `Expected Benefit: ${rec.expectedBenefit} | Est. Score Gain: +${rec.scoreGain} point(s)`;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        const benefitLines = doc.splitTextToSize(benefitTextStr, contentWidth - 12);
+
+        const blockHeight = (titleLines.length * 4.5) + (recLines.length * 4) + (benefitLines.length * 4) + 8;
+        checkPageBreak(blockHeight);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(40, 40, 40);
+        doc.text(titleLines, margin, y);
+        y += (titleLines.length * 4.5);
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(80, 80, 80);
-        
-        const recText = doc.splitTextToSize(`Recommendation: ${rec.recommendation}`, pageWidth - (margin * 2) - 5);
-        doc.text(recText, margin + 3, y);
-        y += (recText.length * 4);
+        doc.setFontSize(8);
+        doc.setTextColor(70, 70, 70);
+        doc.text(recLines, margin + 3, y);
+        y += (recLines.length * 4);
 
-        const benefitText = `Expected Benefit: ${rec.expectedBenefit} | Est. Score Gain: +${rec.scoreGain} point(s)`;
-        doc.text(benefitText, margin + 3, y);
-        y += 7;
+        doc.text(benefitLines, margin + 3, y);
+        y += (benefitLines.length * 4) + 6;
       });
     }
 
@@ -279,16 +351,17 @@ export default function AnalysisResults({
     doc.text('DETAILED QUESTION ASSESSMENT', margin, y);
     y += 4;
     doc.setLineWidth(0.3);
+    doc.setDrawColor(200, 200, 200);
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
 
     pillars.forEach((p) => {
-      checkPageBreak(20);
+      checkPageBreak(25);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(26, 80, 54);
       doc.text(`${p.label.toUpperCase()} PILLAR (${p.score} / ${p.maxScore})`, margin, y);
-      y += 5;
+      y += 6;
 
       p.questions.forEach((q, idx) => {
         const ratingEnum = q.score === 4 ? 'VERY_GOOD' :
@@ -296,55 +369,46 @@ export default function AnalysisResults({
                            q.score === 2 ? 'AVERAGE' :
                            q.score === 1 ? 'BAD' : 'VERY_BAD';
 
-        // Question header
-        const qNum = `${idx + 1}. `;
-        const qHeader = `${qNum}${q.question}`;
-        const qHeaderLines = doc.splitTextToSize(qHeader, pageWidth - (margin * 2) - 6);
-        
-        // Score & rating enum line
-        const scoreRatingText = `Score: ${q.score}/4  |  Rating: ${ratingEnum}`;
-        
-        // Evidence & Reason lines
-        const evidenceText = q.evidence ? `Evidence: ${q.evidence}` : 'Evidence: None recorded.';
-        const reasonText = q.reason ? `Reasoning: ${q.reason}` : 'Reasoning: None recorded.';
-        const evidenceLines = doc.splitTextToSize(evidenceText, pageWidth - (margin * 2) - 8);
-        const reasonLines = doc.splitTextToSize(reasonText, pageWidth - (margin * 2) - 8);
-        
-        const blockHeight = (qHeaderLines.length * 4.5) + 5 + (evidenceLines.length * 4) + (reasonLines.length * 4) + 6;
-        checkPageBreak(blockHeight);
-
-        // Render question text
+        const qHeader = `${idx + 1}. ${q.question}`;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
-        doc.setTextColor(60, 60, 60);
-        doc.text(qHeaderLines, margin + 2, y);
-        y += (qHeaderLines.length * 4.5);
+        const qHeaderLines = doc.splitTextToSize(qHeader, contentWidth - 10);
+        
+        const scoreRatingText = `Score: ${q.score}/4  |  Rating: ${ratingEnum}`;
+        
+        const reasonText = q.reason ? `Reasoning: ${q.reason}` : 'Reasoning: None recorded.';
 
-        // Render score & rating
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        const reasonLines = doc.splitTextToSize(reasonText, contentWidth - 12);
+
+        const blockHeight = (qHeaderLines.length * 4.2) + 5 + (reasonLines.length * 4) + 7;
+        checkPageBreak(blockHeight);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(40, 40, 40);
+        doc.text(qHeaderLines, margin, y);
+        y += (qHeaderLines.length * 4.2);
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(26, 80, 54);
-        doc.text(scoreRatingText, margin + 4, y);
+        doc.text(scoreRatingText, margin + 3, y);
         y += 4.5;
 
-        // Render evidence
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(80, 80, 80);
-        doc.text(evidenceLines, margin + 4, y);
-        y += (evidenceLines.length * 4);
-
-        // Render reason
-        doc.text(reasonLines, margin + 4, y);
-        y += (reasonLines.length * 4) + 4;
+        doc.text(reasonLines, margin + 3, y);
+        y += (reasonLines.length * 4) + 5;
       });
-      y += 2;
+      y += 3;
     });
 
-    // Timeline Footer
+    // Timeline Footer Section
     if (timeline) {
       checkPageBreak(35);
-      y += 2;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(50, 50, 50);
@@ -356,17 +420,91 @@ export default function AnalysisResults({
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
+      doc.setTextColor(100, 100, 100);
 
       const formatTS = (iso: string | null) => {
         if (!iso) return 'N/A';
         return new Date(iso).toLocaleString();
       };
 
-      doc.text(`Image Uploaded: ${formatTS(timeline.imageUploaded)}`, margin + 2, y); y += 4;
-      doc.text(`Validation Completed: ${formatTS(timeline.validationComplete)}`, margin + 2, y); y += 4;
-      doc.text(`Audit Started: ${formatTS(timeline.auditStarted)}`, margin + 2, y); y += 4;
-      doc.text(`Audit Completed: ${formatTS(timeline.auditCompleted)}`, margin + 2, y);
+      doc.text(`Image Uploaded: ${formatTS(timeline.imageUploaded)}`, margin + 3, y); y += 4.5;
+      doc.text(`Validation Completed: ${formatTS(timeline.validationComplete)}`, margin + 3, y); y += 4.5;
+      doc.text(`Audit Started: ${formatTS(timeline.auditStarted)}`, margin + 3, y); y += 4.5;
+      doc.text(`Audit Completed: ${formatTS(timeline.auditCompleted)}`, margin + 3, y);
+    }
+
+    // Phase 7 – Improvement Visualization Section (final page)
+    if (iveResult && iveResult.metadata.executionStatus !== 'SKIPPED' && iveResult.metadata.executionStatus !== 'ERROR') {
+      doc.addPage();
+      y = 20;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      doc.text('EXPECTED WORKPLACE AFTER 5S IMPROVEMENTS', margin, y);
+      y += 4;
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 6;
+
+      const imgHalf = (contentWidth - 6) / 2;
+
+      // Before label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.text('Current Workplace', margin + imgHalf / 2, y, { align: 'center' });
+      doc.text('Expected After 5S Improvements', margin + imgHalf + 6 + imgHalf / 2, y, { align: 'center' });
+      y += 5;
+
+      const imgHeight = 70;
+      // Before image
+      try {
+        const beforeSrc = iveResult.originalImageUrl.replace(/^__geo:[^_]*__/, '');
+        doc.addImage(beforeSrc, 'JPEG', margin, y, imgHalf, imgHeight, undefined, 'FAST');
+      } catch {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, y, imgHalf, imgHeight, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(140, 140, 140);
+        doc.text('Image unavailable', margin + imgHalf / 2, y + imgHeight / 2, { align: 'center' });
+      }
+      // After image
+      try {
+        const afterSrc = iveResult.asset.primaryUrl.replace(/^__geo:[^_]*__/, '');
+        doc.addImage(afterSrc, 'JPEG', margin + imgHalf + 6, y, imgHalf, imgHeight, undefined, 'FAST');
+      } catch {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin + imgHalf + 6, y, imgHalf, imgHeight, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(140, 140, 140);
+        doc.text('Visualization unavailable', margin + imgHalf + 6 + imgHalf / 2, y + imgHeight / 2, { align: 'center' });
+      }
+      y += imgHeight + 8;
+
+      // Arrow separator
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(26, 80, 54);
+      doc.text('→  Improved 5S Compliance State', pageWidth / 2, y - imgHeight / 2, { align: 'center' });
+
+      // Disclaimer
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 120, 120);
+      const disclaimerLines = doc.splitTextToSize(iveResult.disclaimerText, contentWidth - 10);
+      doc.text(disclaimerLines, margin + 3, y);
+    }
+
+    // Add running footers with total page count to all pages
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(140, 140, 140);
+      doc.text('© 2026 ARCOLAB — Digital Auditor 5S Workplace Audit Record', margin, pageHeight - 8);
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     }
 
     doc.save(`5S-Audit-Report-${areaInfo.areaName.replace(/\s+/g, '-')}-${areaInfo.auditDate.replace(/\s+/g, '-')}.pdf`);
@@ -374,7 +512,7 @@ export default function AnalysisResults({
 
 
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-8 font-sans w-full">
       {/* 11. Audit Progress Stepper */}
       <AuditProgressStepper currentStep={6} />
 
@@ -382,7 +520,7 @@ export default function AnalysisResults({
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm print:border-none print:shadow-none">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-xl">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-xl shrink-0">
               AL
             </div>
             <div className="text-center sm:text-left">
@@ -456,13 +594,13 @@ export default function AnalysisResults({
         </div>
       </div>
 
-      {/* 2. Executive Summary - Promoted to the top section of the report */}
+      {/* 2. Executive Summary */}
       <div className="print:break-inside-avoid">
         <AuditSummaryCard summary={enhancedSummary} />
       </div>
 
       {/* 3. Interactive Pillar Navigation */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 no-print items-stretch">
         {pillars.map((pillar) => (
           <PillarCard
             key={pillar.name}
@@ -477,43 +615,44 @@ export default function AnalysisResults({
         ))}
       </div>
 
-      {/* Split layout: Sticky Image Preview + Detailed Assessments */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* 4. Display the Uploaded Image During Assessment */}
-        <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
-                Workplace Audit Evidence
-              </h4>
-              <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                Audited State
-              </span>
-            </div>
-            <div className="relative group overflow-hidden rounded-lg border border-border bg-muted">
-              <img
-                src={workplaceImage.replace(/^__geo:[^_]*__/, "")}
-                alt="Audited Workspace"
-                className="w-full h-auto max-h-96 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
-              Verify questions below against this active visual record.
-            </p>
-          </div>
+      {/* 4. Split layout: Aligned Sticky Evidence Preview + Detailed Assessments */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between no-print border-b border-border/60 pb-2">
+          <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
+            Detailed Pillar Checklist & Evidence
+          </h3>
+          <span className="text-[10px] text-muted-foreground font-semibold">
+            Click any row below to review observations
+          </span>
         </div>
 
-        {/* Detailed Assessments */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between no-print">
-              <h3 className="text-sm font-black uppercase tracking-wider text-muted-foreground">
-                Detailed Pillar Checklist
-              </h3>
-              <span className="text-[10px] text-muted-foreground font-semibold">
-                Click any row below to review observations
-              </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Left Column: Evidence Card */}
+          <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4 print:hidden">
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
+                  Workplace Audit Evidence
+                </h4>
+                <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                  Audited State
+                </span>
+              </div>
+              <div className="relative group overflow-hidden rounded-lg border border-border bg-muted flex items-center justify-center p-1 min-h-[200px]">
+                <img
+                  src={workplaceImage.replace(/^__geo:[^_]*__/, "")}
+                  alt="Audited Workspace"
+                  className="w-full h-auto max-h-96 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed italic text-center">
+                Verify questions below against this active visual record.
+              </p>
             </div>
+          </div>
+
+          {/* Right Column: Detailed Assessments */}
+          <div className="lg:col-span-2 space-y-6">
             {pillars.map((pillar) => (
               <PillarAssessment
                 key={pillar.name}
@@ -583,6 +722,13 @@ export default function AnalysisResults({
         </h3>
         <RecommendationCard recommendations={recommendations} />
       </div>
+
+      {/* Phase 7 – Illustrative Improvement Preview */}
+      {iveResult && (
+        <div className="print:break-inside-avoid">
+          <ImprovementPreviewCard result={iveResult} />
+        </div>
+      )}
 
       {/* Audit Timeline */}
       {timeline && (
