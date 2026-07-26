@@ -6,6 +6,7 @@ import AnalysisResults from "@/components/AnalysisResults";
 import WorkspaceContextCard, { WorkspaceContext } from "@/modules/audit/components/WorkspaceContextCard";
 import ImageValidationPanel from "@/modules/audit/components/ImageValidationPanel";
 import AuditExecutionPanel from "@/modules/audit/components/AuditExecutionPanel";
+import AdditionalAuditInfoPanel from "@/modules/audit/components/AdditionalAuditInfoPanel";
 import AuditProgressStepper from "@/modules/audit/components/AuditProgressStepper";
 import { AuditSessionState, SESSION_STATE_TO_STEP } from "@/modules/audit/types/sessionState";
 import { Loader2, Sparkles, User, BadgeCheck, Building2, AlertTriangle, RotateCcw, Camera } from "lucide-react";
