@@ -412,11 +412,11 @@ const ImageUploader = ({
       {/* ── Image Preview (after capture/upload) ────────────────────────── */}
       {displaySrc ? (
         <div className="space-y-3">
-          <div className="relative rounded-xl overflow-hidden border border-border group">
+          <div className="relative rounded-xl overflow-hidden border border-border group bg-black/5 aspect-[4/3] w-full flex items-center justify-center">
             <img
               src={displaySrc}
               alt={label}
-              className="w-full h-auto object-contain bg-black/5"
+              className="w-full h-full object-contain"
             />
             {/* Download button */}
             <a
