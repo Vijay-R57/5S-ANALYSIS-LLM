@@ -55,6 +55,8 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
   const downloadPdf = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const leftMargin = 15;
+    const rightMargin = 15;
     let y = 20;
 
     const checkPage = (heightNeeded: number) => {
@@ -66,16 +68,17 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
 
     const addParagraph = (
       text: string,
-      fontSize = 10,
+      fontSize = 9.5,
       fontStyle = "normal",
       textColor = [60, 60, 60],
       indent = 15,
-      spacing = 5
+      spacing = 4.5
     ) => {
-      doc.setFont("times", fontStyle);
+      doc.setFont("helvetica", fontStyle);
       doc.setFontSize(fontSize);
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      const lines = doc.splitTextToSize(text, pageWidth - indent - 15);
+      const availableWidth = pageWidth - indent - rightMargin;
+      const lines = doc.splitTextToSize(text, availableWidth);
       lines.forEach((line: string) => {
         checkPage(5);
         doc.text(line, indent, y);
@@ -84,100 +87,104 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     };
 
     // Title
-    doc.setFont("times", "bold");
-    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
     doc.setTextColor(37, 99, 71);
     doc.text("ARCOLAB — 5S Comparison Analysis Report", pageWidth / 2, y, { align: "center" });
-    y += 10;
+    y += 8;
     doc.setDrawColor(37, 99, 71);
     doc.setLineWidth(0.5);
-    doc.line(15, y, pageWidth - 15, y);
+    doc.line(leftMargin, y, pageWidth - rightMargin, y);
     y += 10;
 
     // Timestamps
-    doc.setFont("times", "normal");
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Analysis Date: ${formatDT(timestamp)}`, 15, y);
+    doc.text(`Analysis Date: ${formatDT(timestamp)}`, leftMargin, y);
     y += 5;
     if (beforeUploadTime) {
-      doc.text(`Before Image Uploaded: ${formatDT(beforeUploadTime)}`, 15, y);
+      doc.text(`Before Image Uploaded: ${formatDT(beforeUploadTime)}`, leftMargin, y);
       y += 5;
     }
     if (afterUploadTime) {
-      doc.text(`After Image Uploaded: ${formatDT(afterUploadTime)}`, 15, y);
+      doc.text(`After Image Uploaded: ${formatDT(afterUploadTime)}`, leftMargin, y);
       y += 5;
     }
-    doc.text(`Scoring Engine: ${scoringMethod}`, 15, y);
+    doc.text(`Scoring Engine: ${scoringMethod}`, leftMargin, y);
     y += 12;
 
     // Overview
     checkPage(15);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(40, 40, 40);
-    doc.text("Analysis Overview", 15, y);
+    doc.text("Analysis Overview", leftMargin, y);
     y += 7;
-    addParagraph(data.overview, 10, "normal", [60, 60, 60], 15, 5);
+    addParagraph(data.overview, 9.5, "normal", [60, 60, 60], leftMargin, 4.5);
     y += 4;
 
     // Lean Maintenance Score
     checkPage(15);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(40, 40, 40);
-    doc.text("Lean Maintenance Score", 15, y);
+    doc.text("Lean Maintenance Score", leftMargin, y);
     y += 7;
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
     doc.setTextColor(37, 99, 71);
-    doc.text(`Before: ${data.leanMaintenanceScore}%  →  After: ${data.leanMaintenanceScoreAfter ?? data.leanMaintenanceScore}%`, 15, y);
+    const beforeLean = data.leanMaintenanceScore;
+    const afterLean = data.leanMaintenanceScoreAfter ?? data.leanMaintenanceScore;
+    const leanDelta = afterLean - beforeLean;
+    const leanDeltaStr = leanDelta > 0 ? `(+${leanDelta}%)` : leanDelta < 0 ? `(${leanDelta}%)` : `(0%)`;
+    doc.text(`Before: ${beforeLean}%  ->  After: ${afterLean}%   ${leanDeltaStr}`, leftMargin, y);
     y += 6;
     if (data.leanMaintenanceExplanation) {
-      addParagraph(data.leanMaintenanceExplanation, 9, "normal", [60, 60, 60], 15, 4.5);
+      addParagraph(data.leanMaintenanceExplanation, 9, "normal", [60, 60, 60], leftMargin, 4.5);
       y += 4;
     }
 
-    // 5S Scores
+    // 5S Category Scores
     checkPage(20);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(40, 40, 40);
-    doc.text("5S Category Scores", 15, y);
+    doc.text("5S Category Scores", leftMargin, y);
     y += 8;
 
     doc.setFontSize(9);
-    doc.setFont("times", "bold");
+    doc.setFont("helvetica", "bold");
     doc.setTextColor(60, 60, 60);
-    doc.text("Category", 15, y);
-    doc.text("Before", 85, y);
-    doc.text("After", 105, y);
-    doc.text("Change", 125, y);
+    doc.text("Category", leftMargin, y);
+    doc.text("Before", 120, y);
+    doc.text("After", 150, y);
+    doc.text("Change", 180, y);
     y += 6;
 
     PILLAR_META.forEach((cat) => {
       checkPage(25);
       const before = data.beforeScores[cat.key];
       const after = data.afterScores[cat.key];
-      doc.setFont("times", "bold");
-      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
       doc.setTextColor(40, 40, 40);
-      doc.text(`${cat.label} (${cat.jp})`, 15, y);
-      doc.setFont("times", "normal");
-      doc.text(`${before}%`, 85, y);
-      doc.text(`${after}%`, 105, y);
+      doc.text(`${cat.label} (${cat.jp})`, leftMargin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${before}%`, 120, y);
+      doc.text(`${after}%`, 150, y);
       const delta = Math.round(after - before);
-      const deltaStr = delta > 0 ? `+${delta}%` : delta < 0 ? `${delta}%` : `±0%`;
+      const deltaStr = delta > 0 ? `+${delta}%` : delta < 0 ? `${delta}%` : `0%`;
       doc.setTextColor(delta >= 0 ? 37 : 180, delta >= 0 ? 99 : 30, delta >= 0 ? 71 : 30);
-      doc.text(deltaStr, 125, y);
+      doc.text(deltaStr, 180, y);
       y += 5;
 
       if (data.beforeExplanations?.[cat.key]) {
-        addParagraph(`Before: ${data.beforeExplanations[cat.key]}`, 8, "normal", [100, 100, 100], 18, 3.5);
+        addParagraph(`Before: ${data.beforeExplanations[cat.key]}`, 8.5, "normal", [100, 100, 100], leftMargin + 3, 3.8);
         y += 1;
       }
       if (data.afterExplanations?.[cat.key]) {
-        addParagraph(`After: ${data.afterExplanations[cat.key]}`, 8, "normal", [100, 100, 100], 18, 3.5);
+        addParagraph(`After: ${data.afterExplanations[cat.key]}`, 8.5, "normal", [100, 100, 100], leftMargin + 3, 3.8);
         y += 1;
       }
       y += 2;
@@ -185,23 +192,23 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
 
     checkPage(15);
     y += 3;
-    doc.setFont("times", "bold");
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(40, 40, 40);
     const overallDelta = Math.round(avgAfter - avgBefore);
-    const overallDeltaStr = overallDelta > 0 ? `+${overallDelta}%` : overallDelta < 0 ? `${overallDelta}%` : `±0%`;
-    doc.text(`Overall Score: ${avgBefore}% → ${avgAfter}% (${overallDeltaStr})`, 15, y);
+    const overallDeltaStr = overallDelta > 0 ? `+${overallDelta}%` : overallDelta < 0 ? `${overallDelta}%` : `0%`;
+    doc.text(`Overall Score: ${avgBefore}%  ->  ${avgAfter}% (${overallDeltaStr})`, leftMargin, y);
     y += 12;
 
     // Recommendations
     checkPage(20);
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(40, 40, 40);
-    doc.text("Recommendations", 15, y);
+    doc.text("Recommendations", leftMargin, y);
     y += 8;
     data.recommendations.forEach((rec) => {
-      addParagraph(`• ${rec}`, 10, "normal", [60, 60, 60], 15, 5);
+      addParagraph(`• ${rec}`, 9.5, "normal", [60, 60, 60], leftMargin, 4.5);
       y += 2;
     });
 
@@ -210,12 +217,12 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
       y += 4;
       checkPage(20);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
+      doc.setFontSize(12);
       doc.setTextColor(40, 40, 40);
-      doc.text("Key Improvements Observed", 15, y);
+      doc.text("Key Improvements Observed", leftMargin, y);
       y += 8;
       data.improvements.forEach((imp) => {
-        addParagraph(`• ${imp}`, 10, "normal", [60, 60, 60], 15, 5);
+        addParagraph(`• ${imp}`, 9.5, "normal", [60, 60, 60], leftMargin, 4.5);
         y += 2;
       });
     }
@@ -224,13 +231,13 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     if (data.rootCauseObservations && data.rootCauseObservations.length > 0) {
       y += 4;
       checkPage(20);
-      doc.setFont("times", "bold");
-      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
       doc.setTextColor(40, 40, 40);
-      doc.text("Root Cause Observations", 15, y);
+      doc.text("Root Cause Observations", leftMargin, y);
       y += 8;
       data.rootCauseObservations.forEach((obs) => {
-        addParagraph(`• ${obs}`, 10, "normal", [60, 60, 60], 15, 5);
+        addParagraph(`• ${obs}`, 9.5, "normal", [60, 60, 60], leftMargin, 4.5);
         y += 2;
       });
     }
@@ -239,13 +246,13 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     if (data.safetyRecommendations && data.safetyRecommendations.length > 0) {
       y += 4;
       checkPage(20);
-      doc.setFont("times", "bold");
-      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
       doc.setTextColor(40, 40, 40);
-      doc.text("Safety Compliance Recommendations", 15, y);
+      doc.text("Safety Compliance Recommendations", leftMargin, y);
       y += 8;
       data.safetyRecommendations.forEach((sec) => {
-        addParagraph(`• ${sec}`, 10, "normal", [60, 60, 60], 15, 5);
+        addParagraph(`• ${sec}`, 9.5, "normal", [60, 60, 60], leftMargin, 4.5);
         y += 2;
       });
     }
@@ -254,11 +261,11 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFont("times", "italic");
+      doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
       doc.text("© 2026 ARCOLAB — 5S Comparison Analysis", pageWidth / 2, 287, { align: "center" });
-      doc.text(`Page ${i} of ${totalPages}`, pageWidth - 15, 287, { align: "right" });
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth - rightMargin, 287, { align: "right" });
     }
 
     doc.save("ArcoLabs-5S-Comparison-Report.pdf");
