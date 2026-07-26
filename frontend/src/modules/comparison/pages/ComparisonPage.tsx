@@ -320,10 +320,6 @@ const ComparisonPage = () => {
                       <BadgeCheck className="h-4 w-4 text-primary flex-shrink-0" />
                       <span>ID: <span className="font-medium text-foreground">{employee?.employeeId ?? "ARC100"}</span></span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span>Dept: <span className="font-medium text-foreground">{employee?.department ?? "Operational Excellence"}</span></span>
-                    </div>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 sm:border-l sm:border-border sm:pl-6">

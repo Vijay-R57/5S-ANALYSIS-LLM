@@ -29,18 +29,18 @@ interface Props {
   onContextChange: (ctx: WorkspaceContext) => void;
 }
 
-export default function WorkspaceContextCard({ defaultIndustry = '', onContextChange }: Props) {
-  const [zone,     setZone]     = useState<string>('');
-  const [industry, setIndustry] = useState(defaultIndustry);
+export default function WorkspaceContextCard({ defaultIndustry = 'Operational Excellence', onContextChange }: Props) {
+  const [zone, setZone] = useState<string>('');
+  const industry = defaultIndustry || 'Operational Excellence';
 
   // Notify parent whenever context is complete
   useEffect(() => {
-    if (zone && industry.trim()) {
-      onContextChange({ selectedZone: zone, workspaceType: 'General', industry: industry.trim() });
+    if (zone) {
+      onContextChange({ selectedZone: zone, workspaceType: 'General', industry });
     }
   }, [zone, industry, onContextChange]);
 
-  const isComplete = !!(zone && industry.trim());
+  const isComplete = !!zone;
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -98,29 +98,10 @@ export default function WorkspaceContextCard({ defaultIndustry = '', onContextCh
         {/* Zone preview — animates in when zone selected */}
         {zone && <ZonePreviewPanel zone={zone} />}
 
-        {/* Industry Sector Input (Aligned full-width like Audit Zone) */}
-        <div className="space-y-2">
-          <label
-            htmlFor="industry-input"
-            className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-          >
-            <Building2 className="h-3.5 w-3.5 text-primary" />
-            Industry / Sector <span className="text-destructive">*</span>
-          </label>
-          <input
-            id="industry-input"
-            type="text"
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-            placeholder="e.g. Chemical Manufacturing"
-            className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
-          />
-        </div>
-
         {/* Completion indicator */}
         {!isComplete && (
           <p className="text-[11px] text-muted-foreground italic">
-            Complete all fields above to proceed to image upload.
+            Complete field above to proceed to image upload.
           </p>
         )}
       </div>
